@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { EventContactsPanel } from "@/components/reports/EventContactsPanel";
 import { EventTimelineChart } from "@/components/reports/EventTimelineChart";
+import { CampaignComparisonChart } from "@/components/reports/CampaignComparisonChart";
 import { Eye, MousePointerClick, AlertTriangle, Mail } from "lucide-react";
 
 export default function ReportsPage() {
@@ -128,6 +129,10 @@ export default function ReportsPage() {
 
       <div className="mt-6">
         <EventTimelineChart />
+      </div>
+
+      <div className="mt-6">
+        <CampaignComparisonChart />
       </div>
 
       <div className="mt-6">

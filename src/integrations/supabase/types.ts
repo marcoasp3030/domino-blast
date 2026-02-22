@@ -729,6 +729,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_campaign_performance: {
+        Args: { _company_id: string }
+        Returns: {
+          bounces: number
+          campaign_id: string
+          campaign_name: string
+          clicks: number
+          delivered: number
+          opens: number
+          sent_at: string
+          spam: number
+          total_recipients: number
+          unsubscribes: number
+        }[]
+      }
       get_event_counts: {
         Args: { _company_id: string }
         Returns: {
