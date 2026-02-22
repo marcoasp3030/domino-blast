@@ -1,12 +1,13 @@
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2, Send, Loader2, Pencil, RotateCcw } from "lucide-react";
+import { Plus, Trash2, Send, Loader2, Pencil, RotateCcw, BarChart3 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useState } from "react";
 import { toast } from "sonner";
 import { CampaignWizardDialog } from "@/components/campaigns/CampaignWizardDialog";
+import { CampaignRecipientsDialog } from "@/components/campaigns/CampaignRecipientsDialog";
 
 const statusClass: Record<string, string> = {
   completed: "badge-success", sending: "badge-info", scheduled: "badge-warning",
@@ -22,6 +23,7 @@ export default function CampaignsPage() {
   const queryClient = useQueryClient();
   const [wizardOpen, setWizardOpen] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<any>(null);
+  const [recipientsCampaign, setRecipientsCampaign] = useState<{ id: string; name: string } | null>(null);
 
   const { data: campaigns = [], isLoading } = useQuery({
     queryKey: ["campaigns", companyId],
@@ -101,15 +103,20 @@ export default function CampaignsPage() {
                     {c.scheduled_at && <span>• Agendada: {new Date(c.scheduled_at).toLocaleString("pt-BR")}</span>}
                   </div>
                 </div>
-                <div className="flex items-center gap-6 text-sm">
-                  <div className="text-center">
-                    <p className="text-muted-foreground text-xs">Destinatários</p>
-                    <p className="font-semibold">{c.total_recipients || 0}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-muted-foreground text-xs">Data</p>
-                    <p className="font-semibold">{new Date(c.created_at).toLocaleDateString("pt-BR")}</p>
-                  </div>
+                  <div className="flex items-center gap-6 text-sm">
+                    <div className="text-center">
+                      <p className="text-muted-foreground text-xs">Destinatários</p>
+                      <p className="font-semibold">{c.total_recipients || 0}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-muted-foreground text-xs">Data</p>
+                      <p className="font-semibold">{new Date(c.created_at).toLocaleDateString("pt-BR")}</p>
+                    </div>
+                    {(c.status === "completed" || c.status === "sending") && (
+                      <Button size="sm" variant="ghost" className="gap-1.5 h-8" onClick={() => setRecipientsCampaign({ id: c.id, name: c.name })}>
+                        <BarChart3 className="h-3.5 w-3.5" /> Ver Atividade
+                      </Button>
+                    )}
                   {(c.status === "draft" || c.status === "error") && (
                     <div className="flex gap-1">
                       <Button size="sm" variant="outline" className="gap-1.5 h-8" onClick={() => { setEditingCampaign(c); setWizardOpen(true); }}>
@@ -156,6 +163,7 @@ export default function CampaignsPage() {
       </div>
 
       <CampaignWizardDialog open={wizardOpen} onOpenChange={setWizardOpen} editCampaign={editingCampaign} />
+      <CampaignRecipientsDialog open={!!recipientsCampaign} onOpenChange={(o) => !o && setRecipientsCampaign(null)} campaign={recipientsCampaign} />
     </AppLayout>
   );
 }
