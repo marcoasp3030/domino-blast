@@ -33,9 +33,24 @@ const EVENT_LABELS: Record<string, string> = {
   unsubscribe: "Unsub",
 };
 
+const ALL_EVENT_KEYS = Object.keys(EVENT_LABELS);
+
 export function EventTimelineChart() {
   const { companyId } = useAuth();
   const [days, setDays] = useState("30");
+  const [visibleEvents, setVisibleEvents] = useState<Set<string>>(new Set(ALL_EVENT_KEYS));
+
+  const toggleEvent = (key: string) => {
+    setVisibleEvents((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        if (next.size > 1) next.delete(key); // keep at least one
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
 
   const { data: chartData = [], isLoading } = useQuery({
     queryKey: ["event-timeline", companyId, days],
@@ -87,6 +102,30 @@ export function EventTimelineChart() {
         </Select>
       </div>
 
+      <div className="flex flex-wrap gap-2 mb-4">
+        {ALL_EVENT_KEYS.map((key) => {
+          const active = visibleEvents.has(key);
+          return (
+            <button
+              key={key}
+              onClick={() => toggleEvent(key)}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+                active
+                  ? "border-transparent text-white"
+                  : "border-border text-muted-foreground bg-transparent opacity-50"
+              }`}
+              style={active ? { background: EVENT_COLORS[key] } : undefined}
+            >
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{ background: EVENT_COLORS[key] }}
+              />
+              {EVENT_LABELS[key]}
+            </button>
+          );
+        })}
+      </div>
+
       {isLoading ? (
         <Skeleton className="h-[300px] w-full rounded-lg" />
       ) : !hasData ? (
@@ -128,13 +167,13 @@ export function EventTimelineChart() {
                 );
               }}
             />
-            <Legend wrapperStyle={{ fontSize: "12px" }} />
-            {Object.entries(EVENT_LABELS).map(([key, label]) => (
+            <Legend content={() => null} />
+            {ALL_EVENT_KEYS.filter((key) => visibleEvents.has(key)).map((key) => (
               <Line
                 key={key}
                 type="monotone"
                 dataKey={key}
-                name={label}
+                name={EVENT_LABELS[key]}
                 stroke={EVENT_COLORS[key]}
                 strokeWidth={2}
                 dot={false}
