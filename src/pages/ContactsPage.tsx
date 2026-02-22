@@ -1,7 +1,7 @@
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Upload, Plus, Search, ChevronLeft, ChevronRight, MoreHorizontal, Pencil, Trash2, Download } from "lucide-react";
+import { Upload, Plus, Search, ChevronLeft, ChevronRight, MoreHorizontal, Pencil, Trash2, Download, Tags } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -13,6 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { CsvImportDialog } from "@/components/contacts/CsvImportDialog";
 import { ContactActivityDialog } from "@/components/contacts/ContactActivityDialog";
+import { useContactTags, useTags, ContactTagBadges, ContactTagPicker, TagManagerDialog } from "@/components/contacts/ContactTags";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -52,6 +53,8 @@ export default function ContactsPage() {
   // Bulk selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [tagManagerOpen, setTagManagerOpen] = useState(false);
+  const [tagFilter, setTagFilter] = useState<string>("all");
 
   const handleSearch = (value: string) => {
     setSearch(value);
@@ -90,6 +93,11 @@ export default function ContactsPage() {
     },
     enabled: !!companyId,
   });
+
+  // Fetch tags for current page contacts
+  const contactIds = contacts.map((c) => c.id);
+  const { data: contactTagsMap = {} } = useContactTags(contactIds);
+  const { data: allTags = [] } = useTags();
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
@@ -212,6 +220,7 @@ export default function ContactsPage() {
           <p className="page-description">Gerencie sua base de contatos e leads ({totalCount})</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="gap-2" onClick={() => setTagManagerOpen(true)}><Tags className="h-4 w-4" /> Tags</Button>
           <Button variant="outline" size="sm" className="gap-2" onClick={exportCsv}><Download className="h-4 w-4" /> Exportar</Button>
           <Button variant="outline" size="sm" className="gap-2" onClick={() => setImportOpen(true)}><Upload className="h-4 w-4" /> Importar</Button>
           <CsvImportDialog open={importOpen} onOpenChange={setImportOpen} />
@@ -249,6 +258,22 @@ export default function ContactsPage() {
             <SelectItem value="bounced">Bounced</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={tagFilter} onValueChange={(v) => { setTagFilter(v); setPage(0); }}>
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="Tag" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as tags</SelectItem>
+            {allTags.map((t) => (
+              <SelectItem key={t.id} value={t.id}>
+                <span className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: t.color || "#3B82F6" }} />
+                  {t.name}
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Bulk action bar */}
@@ -280,14 +305,20 @@ export default function ContactsPage() {
             ) : contacts.length === 0 ? (
               <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">Nenhum contato encontrado</td></tr>
             ) : (
-              contacts.map((c) => (
+              contacts.filter((c) => tagFilter === "all" || (contactTagsMap[c.id] || []).some((t) => t.id === tagFilter)).map((c) => (
                 <tr key={c.id} className={`border-t border-border hover:bg-muted/50 transition-colors cursor-pointer ${selectedIds.has(c.id) ? "bg-muted/40" : ""}`} onClick={() => setActivityContact({ id: c.id, name: c.name, email: c.email })}>
                   <td className="px-3 py-4" onClick={(e) => e.stopPropagation()}>
                     <Checkbox checked={selectedIds.has(c.id)} onCheckedChange={() => toggleSelect(c.id)} aria-label={`Selecionar ${c.name || c.email}`} />
                   </td>
                   <td className="px-6 py-4">
-                    <p className="font-medium">{c.name || "-"}</p>
-                    <p className="text-sm text-muted-foreground">{c.email}</p>
+                    <div className="flex items-center gap-1.5">
+                      <div className="min-w-0">
+                        <p className="font-medium">{c.name || "-"}</p>
+                        <p className="text-sm text-muted-foreground">{c.email}</p>
+                        <ContactTagBadges tags={contactTagsMap[c.id] || []} />
+                      </div>
+                      <ContactTagPicker contactId={c.id} currentTags={contactTagsMap[c.id] || []} />
+                    </div>
                   </td>
                   <td className="px-6 py-4"><span className={statusClass[c.status] || "badge-neutral"}>{statusLabel[c.status] || c.status}</span></td>
                   <td className="px-6 py-4 text-sm text-muted-foreground">{c.origin || "-"}</td>
@@ -414,6 +445,7 @@ export default function ContactsPage() {
       </AlertDialog>
 
       <ContactActivityDialog open={!!activityContact} onOpenChange={(o) => !o && setActivityContact(null)} contact={activityContact} />
+      <TagManagerDialog open={tagManagerOpen} onOpenChange={setTagManagerOpen} />
     </AppLayout>
   );
 }
