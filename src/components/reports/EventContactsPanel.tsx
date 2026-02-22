@@ -9,7 +9,16 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, ChevronLeft, ChevronRight, Download, Mail, MousePointerClick, Eye, AlertTriangle, ShieldAlert, UserMinus } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Search, ChevronLeft, ChevronRight, Download, Mail, MousePointerClick, Eye, AlertTriangle, ShieldAlert, UserMinus, CalendarDays } from "lucide-react";
+import { subDays } from "date-fns";
+
+const PERIOD_OPTIONS = [
+  { value: "7", label: "Últimos 7 dias" },
+  { value: "30", label: "Últimos 30 dias" },
+  { value: "90", label: "Últimos 90 dias" },
+  { value: "all", label: "Todo o período" },
+] as const;
 
 const EVENT_TABS = [
   { value: "open", label: "Aberturas", icon: Eye, color: "hsl(262, 83%, 58%)" },
@@ -27,6 +36,14 @@ export function EventContactsPanel() {
   const [activeTab, setActiveTab] = useState<string>("open");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
+  const [period, setPeriod] = useState("30");
+
+  const periodStart = period !== "all" ? subDays(new Date(), Number(period)).toISOString() : null;
+
+  const applyPeriod = (q: any) => {
+    if (periodStart) q = q.gte("timestamp", periodStart);
+    return q;
+  };
 
   const handleTabChange = (v: string) => {
     setActiveTab(v);
@@ -35,12 +52,13 @@ export function EventContactsPanel() {
   };
 
   const { data: totalCount = 0 } = useQuery({
-    queryKey: ["event-contacts-count", companyId, activeTab, search],
+    queryKey: ["event-contacts-count", companyId, activeTab, search, period],
     queryFn: async () => {
       let q = supabase
         .from("events")
         .select("contact_id, contacts!inner(name, email)", { count: "exact", head: true })
         .eq("event_type", activeTab as EventType);
+      q = applyPeriod(q);
 
       if (search) {
         q = q.or(`name.ilike.%${search}%,email.ilike.%${search}%`, { referencedTable: "contacts" });
@@ -53,14 +71,15 @@ export function EventContactsPanel() {
   });
 
   const { data: contacts = [], isLoading } = useQuery({
-    queryKey: ["event-contacts", companyId, activeTab, search, page],
+    queryKey: ["event-contacts", companyId, activeTab, search, page, period],
     queryFn: async () => {
       let q = supabase
         .from("events")
         .select("contact_id, timestamp, url, contacts!inner(name, email, status), campaigns(name)")
         .eq("event_type", activeTab as EventType)
-        .order("timestamp", { ascending: false })
-        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+        .order("timestamp", { ascending: false });
+      q = applyPeriod(q);
+      q = q.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
       if (search) {
         q = q.or(`name.ilike.%${search}%,email.ilike.%${search}%`, { referencedTable: "contacts" });
@@ -102,8 +121,9 @@ export function EventContactsPanel() {
       .from("events")
       .select("contact_id, timestamp, url, contacts!inner(name, email, status), campaigns(name)")
       .eq("event_type", activeTab as EventType)
-      .order("timestamp", { ascending: false })
-      .limit(5000);
+      .order("timestamp", { ascending: false });
+    q = applyPeriod(q);
+    q = q.limit(5000);
 
     if (search) {
       q = q.or(`name.ilike.%${search}%,email.ilike.%${search}%`, { referencedTable: "contacts" });
@@ -142,7 +162,18 @@ export function EventContactsPanel() {
             <h3 className="text-base font-semibold">Contatos por Evento</h3>
             <p className="text-sm text-muted-foreground">Veja quem interagiu com suas campanhas</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Select value={period} onValueChange={(v) => { setPeriod(v); setPage(0); }}>
+              <SelectTrigger className="h-8 w-[160px] text-sm">
+                <CalendarDays className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PERIOD_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
               <Input
