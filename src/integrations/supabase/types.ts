@@ -736,6 +736,14 @@ export type Database = {
           event_type: string
         }[]
       }
+      get_event_timeline: {
+        Args: { _company_id: string; _days?: number }
+        Returns: {
+          count: number
+          day: string
+          event_type: string
+        }[]
+      }
       get_user_company_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
