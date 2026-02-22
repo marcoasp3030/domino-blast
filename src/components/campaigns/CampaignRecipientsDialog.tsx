@@ -4,7 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Mail, Eye, MousePointerClick, AlertTriangle, ShieldX, UserMinus, ArrowDownCircle, Activity, Users } from "lucide-react";
+import { Mail, Eye, MousePointerClick, AlertTriangle, ShieldX, UserMinus, ArrowDownCircle, Activity, Users, Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface CampaignRecipientsDialogProps {
   open: boolean;
@@ -80,6 +81,23 @@ export function CampaignRecipientsDialog({ open, onOpenChange, campaign }: Campa
     return contacts.filter((c) => c.events.some((e) => e.event_type === filterType));
   };
 
+  const exportCsv = () => {
+    if (!contacts.length || !campaign) return;
+    const header = "Nome,Email,Eventos\n";
+    const rows = contacts.map((c) => {
+      const types = [...new Set(c.events.map((e) => eventConfig[e.event_type]?.label || e.event_type))].join("; ");
+      return [c.name || "Sem nome", c.email, types]
+        .map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",");
+    }).join("\n");
+    const blob = new Blob([header + rows], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `campanha-${campaign.name}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[85vh]">
@@ -90,6 +108,11 @@ export function CampaignRecipientsDialog({ open, onOpenChange, campaign }: Campa
           </DialogTitle>
           {campaign && (
             <p className="text-sm text-muted-foreground">{campaign.name}</p>
+          )}
+          {contacts.length > 0 && (
+            <Button variant="outline" size="sm" className="gap-2 w-fit" onClick={exportCsv}>
+              <Download className="h-4 w-4" /> Exportar CSV
+            </Button>
           )}
         </DialogHeader>
 

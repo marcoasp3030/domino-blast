@@ -3,8 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Mail, Eye, MousePointerClick, AlertTriangle, ShieldX, UserMinus, ArrowDownCircle, Activity } from "lucide-react";
+import { Mail, Eye, MousePointerClick, AlertTriangle, ShieldX, UserMinus, ArrowDownCircle, Activity, Download } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 
 interface ContactActivityDialogProps {
   open: boolean;
@@ -44,6 +45,28 @@ export function ContactActivityDialog({ open, onOpenChange, contact }: ContactAc
 
   const eventTypes = ["all", "delivered", "open", "click", "bounce", "spam", "unsubscribe", "dropped"];
 
+  const exportCsv = () => {
+    if (!events.length || !contact) return;
+    const header = "Evento,Campanha,URL,IP,Data\n";
+    const rows = events.map((e) => {
+      const cfg = eventConfig[e.event_type];
+      return [
+        cfg?.label || e.event_type,
+        e.campaigns?.name || "",
+        e.url || "",
+        e.ip_address || "",
+        new Date(e.timestamp).toLocaleString("pt-BR"),
+      ].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",");
+    }).join("\n");
+    const blob = new Blob([header + rows], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `atividade-${contact.email}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[85vh]">
@@ -54,8 +77,13 @@ export function ContactActivityDialog({ open, onOpenChange, contact }: ContactAc
           </DialogTitle>
           {contact && (
             <div className="text-sm text-muted-foreground">
-              <span className="font-medium text-foreground">{contact.name || "Sem nome"}</span> — {contact.email}
+          <span className="font-medium text-foreground">{contact.name || "Sem nome"}</span> — {contact.email}
             </div>
+          )}
+          {events.length > 0 && (
+            <Button variant="outline" size="sm" className="gap-2 w-fit" onClick={exportCsv}>
+              <Download className="h-4 w-4" /> Exportar CSV
+            </Button>
           )}
         </DialogHeader>
 
