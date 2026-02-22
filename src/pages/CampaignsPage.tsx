@@ -1,6 +1,6 @@
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2, Send, Loader2 } from "lucide-react";
+import { Plus, Trash2, Send, Loader2, Pencil, RotateCcw } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -21,6 +21,7 @@ export default function CampaignsPage() {
   const { companyId } = useAuth();
   const queryClient = useQueryClient();
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [editingCampaign, setEditingCampaign] = useState<any>(null);
 
   const { data: campaigns = [], isLoading } = useQuery({
     queryKey: ["campaigns", companyId],
@@ -49,6 +50,9 @@ export default function CampaignsPage() {
     if (!confirm("Tem certeza que deseja enviar esta campanha agora? Os emails serão enviados via SendGrid.")) return;
     setSendingId(campaignId);
     try {
+      // Reset status to draft before sending (needed for resend of error/completed campaigns)
+      await supabase.from("campaigns").update({ status: "draft" }).eq("id", campaignId);
+
       const { data, error } = await supabase.functions.invoke("send-campaign", {
         body: { campaign_id: campaignId },
       });
@@ -70,7 +74,7 @@ export default function CampaignsPage() {
           <h1 className="page-title">Campanhas</h1>
           <p className="page-description">Crie e gerencie suas campanhas de email</p>
         </div>
-        <Button size="sm" className="gap-2" onClick={() => setWizardOpen(true)}><Plus className="h-4 w-4" /> Nova Campanha</Button>
+        <Button size="sm" className="gap-2" onClick={() => { setEditingCampaign(null); setWizardOpen(true); }}><Plus className="h-4 w-4" /> Nova Campanha</Button>
       </div>
 
       <div className="grid gap-4">
@@ -106,14 +110,35 @@ export default function CampaignsPage() {
                     <p className="text-muted-foreground text-xs">Data</p>
                     <p className="font-semibold">{new Date(c.created_at).toLocaleDateString("pt-BR")}</p>
                   </div>
-                  {c.status === "draft" && (
+                  {(c.status === "draft" || c.status === "error") && (
                     <div className="flex gap-1">
+                      <Button size="sm" variant="outline" className="gap-1.5 h-8" onClick={() => { setEditingCampaign(c); setWizardOpen(true); }}>
+                        <Pencil className="h-3.5 w-3.5" /> Editar
+                      </Button>
                       <Button size="sm" variant="default" className="gap-1.5 h-8" onClick={() => sendCampaign(c.id)} disabled={sendingId === c.id}>
-                        {sendingId === c.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-                        {sendingId === c.id ? "Enviando..." : "Enviar"}
+                        {sendingId === c.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : c.status === "error" ? <RotateCcw className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}
+                        {sendingId === c.id ? "Enviando..." : c.status === "error" ? "Reenviar" : "Enviar"}
                       </Button>
                       <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive h-8 w-8 p-0" onClick={() => { if (confirm("Excluir esta campanha?")) deleteCampaign.mutate(c.id); }}>
                         <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                  {c.status === "completed" && (
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="outline" className="gap-1.5 h-8" onClick={() => { setEditingCampaign(c); setWizardOpen(true); }}>
+                        <Pencil className="h-3.5 w-3.5" /> Editar
+                      </Button>
+                      <Button size="sm" variant="secondary" className="gap-1.5 h-8" onClick={() => sendCampaign(c.id)} disabled={sendingId === c.id}>
+                        {sendingId === c.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                        {sendingId === c.id ? "Enviando..." : "Reenviar"}
+                      </Button>
+                    </div>
+                  )}
+                  {c.status === "scheduled" && (
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="outline" className="gap-1.5 h-8" onClick={() => { setEditingCampaign(c); setWizardOpen(true); }}>
+                        <Pencil className="h-3.5 w-3.5" /> Editar
                       </Button>
                     </div>
                   )}
@@ -130,7 +155,7 @@ export default function CampaignsPage() {
         )}
       </div>
 
-      <CampaignWizardDialog open={wizardOpen} onOpenChange={setWizardOpen} />
+      <CampaignWizardDialog open={wizardOpen} onOpenChange={setWizardOpen} editCampaign={editingCampaign} />
     </AppLayout>
   );
 }
