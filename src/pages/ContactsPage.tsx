@@ -68,7 +68,7 @@ export default function ContactsPage() {
   };
 
   // Helper: get contact IDs matching tag filter
-  const { data: tagFilteredIds } = useQuery({
+  const { data: tagFilteredIds, isLoading: isTagFilterLoading } = useQuery({
     queryKey: ["contacts-by-tag", tagFilter],
     queryFn: async () => {
       if (tagFilter === "all") return null;
@@ -330,7 +330,7 @@ export default function ContactsPage() {
             </tr>
           </thead>
           <tbody>
-            {isLoading ? (
+            {isLoading || (tagFilter !== "all" && isTagFilterLoading) ? (
               <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">Carregando...</td></tr>
             ) : contacts.length === 0 ? (
               <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">Nenhum contato encontrado</td></tr>
