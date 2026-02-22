@@ -9,6 +9,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { CsvImportDialog } from "@/components/contacts/CsvImportDialog";
+import { ContactActivityDialog } from "@/components/contacts/ContactActivityDialog";
 import { Label } from "@/components/ui/label";
 
 const statusClass: Record<string, string> = {
@@ -31,6 +32,7 @@ export default function ContactsPage() {
   const [open, setOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", phone: "", origin: "Manual" });
+  const [activityContact, setActivityContact] = useState<{ id: string; name: string | null; email: string } | null>(null);
 
   const { data: contacts = [], isLoading } = useQuery({
     queryKey: ["contacts", companyId, search],
@@ -115,7 +117,7 @@ export default function ContactsPage() {
               <tr><td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">Nenhum contato encontrado</td></tr>
             ) : (
               contacts.map((c) => (
-                <tr key={c.id} className="border-t border-border hover:bg-muted/50 transition-colors cursor-pointer">
+                <tr key={c.id} className="border-t border-border hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => setActivityContact({ id: c.id, name: c.name, email: c.email })}>
                   <td className="px-6 py-4">
                     <p className="font-medium">{c.name || "-"}</p>
                     <p className="text-sm text-muted-foreground">{c.email}</p>
@@ -129,6 +131,7 @@ export default function ContactsPage() {
           </tbody>
         </table>
       </div>
+      <ContactActivityDialog open={!!activityContact} onOpenChange={(o) => !o && setActivityContact(null)} contact={activityContact} />
     </AppLayout>
   );
 }
