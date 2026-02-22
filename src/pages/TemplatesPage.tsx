@@ -1,6 +1,6 @@
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Plus, Eye, Copy, Layout } from "lucide-react";
+import { Plus, Eye, Copy, Layout, Pencil, Trash2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { TemplateEditorDialog } from "@/components/templates/TemplateEditorDialog";
 
 const typeColors: Record<string, string> = {
   newsletter: "badge-info", promocional: "badge-warning", transacional: "badge-success",
@@ -21,6 +22,8 @@ export default function TemplatesPage() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", type: "newsletter" });
+  const [editorTemplate, setEditorTemplate] = useState<any>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
 
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ["templates", companyId],
@@ -50,6 +53,43 @@ export default function TemplatesPage() {
     },
     onError: (e: any) => toast.error(e.message),
   });
+
+  const duplicateTemplate = useMutation({
+    mutationFn: async (t: any) => {
+      if (!companyId) throw new Error("No company");
+      const { error } = await supabase.from("email_templates").insert({
+        company_id: companyId,
+        name: `${t.name} (cópia)`,
+        type: t.type,
+        html_content: t.html_content,
+        design_json: t.design_json,
+        created_by: user?.id,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["templates"] });
+      toast.success("Template duplicado!");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const deleteTemplate = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("email_templates").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["templates"] });
+      toast.success("Template excluído!");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const openEditor = (t: any) => {
+    setEditorTemplate(t);
+    setEditorOpen(true);
+  };
 
   return (
     <AppLayout>
@@ -95,9 +135,13 @@ export default function TemplatesPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {templates.map((t) => (
-            <div key={t.id} className="rounded-xl border border-border bg-card overflow-hidden hover:shadow-md transition-all cursor-pointer group">
-              <div className="h-40 bg-muted flex items-center justify-center border-b border-border">
-                <Layout className="h-12 w-12 text-muted-foreground/30" />
+            <div key={t.id} className="rounded-xl border border-border bg-card overflow-hidden hover:shadow-md transition-all group">
+              <div className="h-40 bg-muted flex items-center justify-center border-b border-border relative overflow-hidden">
+                {t.html_content ? (
+                  <iframe srcDoc={t.html_content} className="w-full h-full pointer-events-none" title={t.name} style={{ transform: "scale(0.5)", transformOrigin: "top left", width: "200%", height: "200%" }} />
+                ) : (
+                  <Layout className="h-12 w-12 text-muted-foreground/30" />
+                )}
               </div>
               <div className="p-4">
                 <div className="flex items-center justify-between mb-2">
@@ -106,14 +150,17 @@ export default function TemplatesPage() {
                 </div>
                 <p className="text-xs text-muted-foreground mb-3">Atualizado em {new Date(t.updated_at).toLocaleDateString("pt-BR")}</p>
                 <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Button variant="outline" size="sm" className="gap-1 flex-1"><Eye className="h-3 w-3" /> Preview</Button>
-                  <Button variant="outline" size="sm" className="gap-1 flex-1"><Copy className="h-3 w-3" /> Duplicar</Button>
+                  <Button variant="outline" size="sm" className="gap-1 flex-1" onClick={() => openEditor(t)}><Pencil className="h-3 w-3" /> Editar</Button>
+                  <Button variant="outline" size="sm" className="gap-1 flex-1" onClick={() => duplicateTemplate.mutate(t)}><Copy className="h-3 w-3" /> Duplicar</Button>
+                  <Button variant="outline" size="sm" className="gap-1 px-2 text-destructive hover:text-destructive" onClick={() => { if (confirm("Excluir este template?")) deleteTemplate.mutate(t.id); }}><Trash2 className="h-3 w-3" /></Button>
                 </div>
               </div>
             </div>
           ))}
         </div>
       )}
+
+      <TemplateEditorDialog open={editorOpen} onOpenChange={setEditorOpen} template={editorTemplate} />
     </AppLayout>
   );
 }
