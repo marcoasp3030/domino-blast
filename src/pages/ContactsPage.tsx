@@ -1,4 +1,5 @@
 import { AppLayout } from "@/components/layout/AppLayout";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Upload, Plus, Search, ChevronLeft, ChevronRight, MoreHorizontal, Pencil, Trash2, Download, Tags } from "lucide-react";
@@ -331,7 +332,22 @@ export default function ContactsPage() {
           </thead>
           <tbody>
             {isLoading || (tagFilter !== "all" && isTagFilterLoading) ? (
-              <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">Carregando...</td></tr>
+              Array.from({ length: 5 }).map((_, i) => (
+                <tr key={i} className="border-t border-border">
+                  <td className="px-3 py-4"><Skeleton className="h-4 w-4 rounded" /></td>
+                  <td className="px-6 py-4">
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-3 w-48" />
+                      <div className="flex gap-1"><Skeleton className="h-5 w-14 rounded-full" /><Skeleton className="h-5 w-16 rounded-full" /></div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4"><Skeleton className="h-5 w-16 rounded-full" /></td>
+                  <td className="px-6 py-4"><Skeleton className="h-4 w-20" /></td>
+                  <td className="px-6 py-4"><Skeleton className="h-4 w-24" /></td>
+                  <td className="px-6 py-4 text-right"><Skeleton className="h-8 w-8 rounded ml-auto" /></td>
+                </tr>
+              ))
             ) : contacts.length === 0 ? (
               <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">Nenhum contato encontrado</td></tr>
             ) : (
