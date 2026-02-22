@@ -11,22 +11,25 @@ export function StatsCards() {
     queryFn: async () => {
       if (!companyId) return null;
 
-      const [sendsRes, eventsRes, contactsRes] = await Promise.all([
-        supabase.from("sends").select("id, status", { count: "exact" }),
-        supabase.from("events").select("id, event_type"),
-        supabase.from("contacts").select("id", { count: "exact" }),
+      const [sendsRes, eventCountsRes, contactsRes] = await Promise.all([
+        supabase.from("sends").select("id", { count: "exact", head: true }),
+        supabase.rpc("get_event_counts", { _company_id: companyId }),
+        supabase.from("contacts").select("id", { count: "exact", head: true }),
       ]);
 
-      const sends = sendsRes.data || [];
-      const events = eventsRes.data || [];
       const totalSent = sendsRes.count || 0;
-      const delivered = events.filter((e) => e.event_type === "delivered").length;
-      const opened = events.filter((e) => e.event_type === "open").length;
-      const clicked = events.filter((e) => e.event_type === "click").length;
-      const bounced = events.filter((e) => e.event_type === "bounce").length;
-      const spam = events.filter((e) => e.event_type === "spam").length;
+      const counts: Record<string, number> = {};
+      (eventCountsRes.data || []).forEach((r: any) => { counts[r.event_type] = Number(r.count); });
 
-      return { totalSent, delivered, opened, clicked, bounced, spam, totalContacts: contactsRes.count || 0 };
+      return {
+        totalSent,
+        delivered: counts.delivered || 0,
+        opened: counts.open || 0,
+        clicked: counts.click || 0,
+        bounced: counts.bounce || 0,
+        spam: counts.spam || 0,
+        totalContacts: contactsRes.count || 0,
+      };
     },
     enabled: !!companyId,
   });

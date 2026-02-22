@@ -729,6 +729,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_event_counts: {
+        Args: { _company_id: string }
+        Returns: {
+          count: number
+          event_type: string
+        }[]
+      }
       get_user_company_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
