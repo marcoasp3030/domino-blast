@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
     }
 
     // Auth client to verify user
-    const supabaseAuth = createClient(supabaseUrl, Deno.env.get("SUPABASE_PUBLISHABLE_KEY")!, {
+    const supabaseAuth = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: authHeader } },
     });
     const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
