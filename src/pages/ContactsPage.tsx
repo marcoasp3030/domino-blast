@@ -1,7 +1,7 @@
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Upload, Plus, Search, Filter, MoreHorizontal } from "lucide-react";
+import { Upload, Plus, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -11,6 +11,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { CsvImportDialog } from "@/components/contacts/CsvImportDialog";
 import { ContactActivityDialog } from "@/components/contacts/ContactActivityDialog";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+const PAGE_SIZES = [25, 50, 100];
 
 const statusClass: Record<string, string> = {
   active: "badge-success",
@@ -33,17 +36,43 @@ export default function ContactsPage() {
   const [importOpen, setImportOpen] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", phone: "", origin: "Manual" });
   const [activityContact, setActivityContact] = useState<{ id: string; name: string | null; email: string } | null>(null);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
+
+  // Reset page when search changes
+  const handleSearch = (value: string) => {
+    setSearch(value);
+    setPage(0);
+  };
+
+  // Get total count
+  const { data: totalCount = 0 } = useQuery({
+    queryKey: ["contacts-count", companyId, search],
+    queryFn: async () => {
+      let q = supabase.from("contacts").select("*", { count: "exact", head: true });
+      if (search) q = q.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
+      const { count } = await q;
+      return count || 0;
+    },
+    enabled: !!companyId,
+  });
 
   const { data: contacts = [], isLoading } = useQuery({
-    queryKey: ["contacts", companyId, search],
+    queryKey: ["contacts", companyId, search, page, pageSize],
     queryFn: async () => {
-      let q = supabase.from("contacts").select("*").order("created_at", { ascending: false }).limit(50);
+      let q = supabase
+        .from("contacts")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .range(page * pageSize, (page + 1) * pageSize - 1);
       if (search) q = q.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
       const { data } = await q;
       return data || [];
     },
     enabled: !!companyId,
   });
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
   const addContact = useMutation({
     mutationFn: async () => {
@@ -59,6 +88,7 @@ export default function ContactsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contacts"] });
+      queryClient.invalidateQueries({ queryKey: ["contacts-count"] });
       toast.success("Contato adicionado!");
       setOpen(false);
       setForm({ name: "", email: "", phone: "", origin: "Manual" });
@@ -71,7 +101,7 @@ export default function ContactsPage() {
       <div className="page-header flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="page-title">Contatos</h1>
-          <p className="page-description">Gerencie sua base de contatos e leads ({contacts.length})</p>
+          <p className="page-description">Gerencie sua base de contatos e leads ({totalCount})</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" className="gap-2" onClick={() => setImportOpen(true)}><Upload className="h-4 w-4" /> Importar</Button>
@@ -96,7 +126,7 @@ export default function ContactsPage() {
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar por nome ou email..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input placeholder="Buscar por nome ou email..." className="pl-9" value={search} onChange={(e) => handleSearch(e.target.value)} />
         </div>
       </div>
 
@@ -131,6 +161,39 @@ export default function ContactsPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination */}
+      <div className="flex items-center justify-between mt-4 flex-wrap gap-3">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <span>Exibir</span>
+          <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(0); }}>
+            <SelectTrigger className="w-[70px] h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PAGE_SIZES.map((s) => (
+                <SelectItem key={s} value={String(s)}>{s}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <span>por página</span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">
+            {totalCount > 0
+              ? `${page * pageSize + 1}–${Math.min((page + 1) * pageSize, totalCount)} de ${totalCount}`
+              : "0 resultados"}
+          </span>
+          <Button variant="outline" size="icon" className="h-8 w-8" disabled={page === 0} onClick={() => setPage(page - 1)}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="icon" className="h-8 w-8" disabled={page >= totalPages - 1} onClick={() => setPage(page + 1)}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
       <ContactActivityDialog open={!!activityContact} onOpenChange={(o) => !o && setActivityContact(null)} contact={activityContact} />
     </AppLayout>
   );
