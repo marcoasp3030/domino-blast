@@ -38,6 +38,9 @@ export default function ContactsPage() {
   const [activityContact, setActivityContact] = useState<{ id: string; name: string | null; email: string } | null>(null);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  type ContactStatus = "active" | "inactive" | "unsubscribed" | "bounced";
 
   // Reset page when search changes
   const handleSearch = (value: string) => {
@@ -47,10 +50,11 @@ export default function ContactsPage() {
 
   // Get total count
   const { data: totalCount = 0 } = useQuery({
-    queryKey: ["contacts-count", companyId, search],
+    queryKey: ["contacts-count", companyId, search, statusFilter],
     queryFn: async () => {
       let q = supabase.from("contacts").select("*", { count: "exact", head: true });
       if (search) q = q.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
+      if (statusFilter !== "all") q = q.eq("status", statusFilter as ContactStatus);
       const { count } = await q;
       return count || 0;
     },
@@ -58,7 +62,7 @@ export default function ContactsPage() {
   });
 
   const { data: contacts = [], isLoading } = useQuery({
-    queryKey: ["contacts", companyId, search, page, pageSize],
+    queryKey: ["contacts", companyId, search, page, pageSize, statusFilter],
     queryFn: async () => {
       let q = supabase
         .from("contacts")
@@ -66,6 +70,7 @@ export default function ContactsPage() {
         .order("created_at", { ascending: false })
         .range(page * pageSize, (page + 1) * pageSize - 1);
       if (search) q = q.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
+      if (statusFilter !== "all") q = q.eq("status", statusFilter as ContactStatus);
       const { data } = await q;
       return data || [];
     },
@@ -128,6 +133,18 @@ export default function ContactsPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Buscar por nome ou email..." className="pl-9" value={search} onChange={(e) => handleSearch(e.target.value)} />
         </div>
+        <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(0); }}>
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os status</SelectItem>
+            <SelectItem value="active">Ativo</SelectItem>
+            <SelectItem value="inactive">Inativo</SelectItem>
+            <SelectItem value="unsubscribed">Descadastrado</SelectItem>
+            <SelectItem value="bounced">Bounced</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="rounded-xl border border-border bg-card overflow-x-auto">
