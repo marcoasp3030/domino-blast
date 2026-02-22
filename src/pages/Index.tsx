@@ -3,6 +3,7 @@ import { StatsCards } from "@/components/dashboard/StatsCards";
 import { CampaignPerformanceChart } from "@/components/dashboard/CampaignPerformanceChart";
 import { RecentCampaigns } from "@/components/dashboard/RecentCampaigns";
 import { EventBreakdown } from "@/components/dashboard/EventBreakdown";
+import { EventLogPanel } from "@/components/dashboard/EventLogPanel";
 
 const Index = () => {
   return (
@@ -21,8 +22,9 @@ const Index = () => {
         <EventBreakdown />
       </div>
 
-      <div className="mt-6">
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <RecentCampaigns />
+        <EventLogPanel />
       </div>
     </AppLayout>
   );
