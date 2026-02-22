@@ -1,3 +1,4 @@
+import { useState, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Mail, Eye, MousePointerClick, AlertTriangle, ShieldX, UserMinus, ArrowDownCircle, Activity, Users, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DatePeriodFilter } from "@/components/shared/DatePeriodFilter";
 
 interface CampaignRecipientsDialogProps {
   open: boolean;
@@ -31,6 +33,9 @@ type GroupedContact = {
 };
 
 export function CampaignRecipientsDialog({ open, onOpenChange, campaign }: CampaignRecipientsDialogProps) {
+  const [dateFrom, setDateFrom] = useState<Date | null>(null);
+  const [dateTo, setDateTo] = useState<Date | null>(null);
+
   const { data: events = [], isLoading } = useQuery({
     queryKey: ["campaign-recipients", campaign?.id],
     queryFn: async () => {
@@ -45,9 +50,19 @@ export function CampaignRecipientsDialog({ open, onOpenChange, campaign }: Campa
     enabled: !!campaign?.id && open,
   });
 
-  // Group events by contact
+  const filteredEvents = useMemo(() => {
+    if (!dateFrom && !dateTo) return events;
+    return events.filter((e: any) => {
+      const t = new Date(e.timestamp);
+      if (dateFrom && t < dateFrom) return false;
+      if (dateTo && t > dateTo) return false;
+      return true;
+    });
+  }, [events, dateFrom, dateTo]);
+
+  // Group filtered events by contact
   const contactMap = new Map<string, GroupedContact>();
-  events.forEach((e: any) => {
+  filteredEvents.forEach((e: any) => {
     if (!e.contact_id) return;
     if (!contactMap.has(e.contact_id)) {
       contactMap.set(e.contact_id, {
@@ -68,7 +83,7 @@ export function CampaignRecipientsDialog({ open, onOpenChange, campaign }: Campa
 
   // Count unique contacts per event type
   const typeCounts: Record<string, Set<string>> = {};
-  events.forEach((e: any) => {
+  filteredEvents.forEach((e: any) => {
     if (!e.contact_id) return;
     if (!typeCounts[e.event_type]) typeCounts[e.event_type] = new Set();
     typeCounts[e.event_type].add(e.contact_id);
@@ -109,12 +124,16 @@ export function CampaignRecipientsDialog({ open, onOpenChange, campaign }: Campa
           {campaign && (
             <p className="text-sm text-muted-foreground">{campaign.name}</p>
           )}
+        </DialogHeader>
+
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <DatePeriodFilter onFilterChange={(from, to) => { setDateFrom(from); setDateTo(to); }} />
           {contacts.length > 0 && (
-            <Button variant="outline" size="sm" className="gap-2 w-fit" onClick={exportCsv}>
-              <Download className="h-4 w-4" /> Exportar CSV
+            <Button variant="outline" size="sm" className="gap-2 h-7 text-xs" onClick={exportCsv}>
+              <Download className="h-3.5 w-3.5" /> CSV
             </Button>
           )}
-        </DialogHeader>
+        </div>
 
         {/* Summary */}
         <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
@@ -144,7 +163,7 @@ export function CampaignRecipientsDialog({ open, onOpenChange, campaign }: Campa
 
           {filterTypes.map((filterType) => (
             <TabsContent key={filterType} value={filterType}>
-              <ScrollArea className="h-[360px]">
+              <ScrollArea className="h-[300px]">
                 {isLoading ? (
                   <div className="flex items-center justify-center h-32 text-muted-foreground">Carregando...</div>
                 ) : (
@@ -192,7 +211,7 @@ export function CampaignRecipientsDialog({ open, onOpenChange, campaign }: Campa
                       );
                     })}
                     {getFilteredContacts(filterType).length === 0 && (
-                      <div className="text-center text-muted-foreground py-8 text-sm">Nenhum contato nesta categoria</div>
+                      <div className="text-center text-muted-foreground py-8 text-sm">Nenhum contato neste período</div>
                     )}
                   </div>
                 )}

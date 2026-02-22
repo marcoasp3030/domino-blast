@@ -1,3 +1,4 @@
+import { useState, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Mail, Eye, MousePointerClick, AlertTriangle, ShieldX, UserMinus, ArrowDownCircle, Activity, Download } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { DatePeriodFilter } from "@/components/shared/DatePeriodFilter";
 
 interface ContactActivityDialogProps {
   open: boolean;
@@ -24,6 +26,9 @@ const eventConfig: Record<string, { label: string; icon: React.ElementType; vari
 };
 
 export function ContactActivityDialog({ open, onOpenChange, contact }: ContactActivityDialogProps) {
+  const [dateFrom, setDateFrom] = useState<Date | null>(null);
+  const [dateTo, setDateTo] = useState<Date | null>(null);
+
   const { data: events = [], isLoading } = useQuery({
     queryKey: ["contact-activity", contact?.id],
     queryFn: async () => {
@@ -38,7 +43,17 @@ export function ContactActivityDialog({ open, onOpenChange, contact }: ContactAc
     enabled: !!contact?.id && open,
   });
 
-  const eventCounts = events.reduce((acc: Record<string, number>, e) => {
+  const filteredEvents = useMemo(() => {
+    if (!dateFrom && !dateTo) return events;
+    return events.filter((e) => {
+      const t = new Date(e.timestamp);
+      if (dateFrom && t < dateFrom) return false;
+      if (dateTo && t > dateTo) return false;
+      return true;
+    });
+  }, [events, dateFrom, dateTo]);
+
+  const eventCounts = filteredEvents.reduce((acc: Record<string, number>, e) => {
     acc[e.event_type] = (acc[e.event_type] || 0) + 1;
     return acc;
   }, {});
@@ -46,9 +61,9 @@ export function ContactActivityDialog({ open, onOpenChange, contact }: ContactAc
   const eventTypes = ["all", "delivered", "open", "click", "bounce", "spam", "unsubscribe", "dropped"];
 
   const exportCsv = () => {
-    if (!events.length || !contact) return;
+    if (!filteredEvents.length || !contact) return;
     const header = "Evento,Campanha,URL,IP,Data\n";
-    const rows = events.map((e) => {
+    const rows = filteredEvents.map((e) => {
       const cfg = eventConfig[e.event_type];
       return [
         cfg?.label || e.event_type,
@@ -77,15 +92,19 @@ export function ContactActivityDialog({ open, onOpenChange, contact }: ContactAc
           </DialogTitle>
           {contact && (
             <div className="text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">{contact.name || "Sem nome"}</span> — {contact.email}
+              <span className="font-medium text-foreground">{contact.name || "Sem nome"}</span> — {contact.email}
             </div>
           )}
-          {events.length > 0 && (
-            <Button variant="outline" size="sm" className="gap-2 w-fit" onClick={exportCsv}>
-              <Download className="h-4 w-4" /> Exportar CSV
+        </DialogHeader>
+
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <DatePeriodFilter onFilterChange={(from, to) => { setDateFrom(from); setDateTo(to); }} />
+          {filteredEvents.length > 0 && (
+            <Button variant="outline" size="sm" className="gap-2 h-7 text-xs" onClick={exportCsv}>
+              <Download className="h-3.5 w-3.5" /> CSV
             </Button>
           )}
-        </DialogHeader>
+        </div>
 
         {/* Summary cards */}
         <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
@@ -107,19 +126,19 @@ export function ContactActivityDialog({ open, onOpenChange, contact }: ContactAc
           <TabsList className="w-full justify-start overflow-x-auto">
             {eventTypes.map((type) => (
               <TabsTrigger key={type} value={type} className="text-xs">
-                {type === "all" ? `Todos (${events.length})` : `${eventConfig[type]?.label || type} (${eventCounts[type] || 0})`}
+                {type === "all" ? `Todos (${filteredEvents.length})` : `${eventConfig[type]?.label || type} (${eventCounts[type] || 0})`}
               </TabsTrigger>
             ))}
           </TabsList>
 
           {eventTypes.map((filterType) => (
             <TabsContent key={filterType} value={filterType}>
-              <ScrollArea className="h-[360px]">
+              <ScrollArea className="h-[320px]">
                 {isLoading ? (
                   <div className="flex items-center justify-center h-32 text-muted-foreground">Carregando...</div>
                 ) : (
                   <div className="space-y-1.5 pr-3">
-                    {events
+                    {filteredEvents
                       .filter((e) => filterType === "all" || e.event_type === filterType)
                       .map((event) => {
                         const config = eventConfig[event.event_type] || { label: event.event_type, icon: Activity, variant: "outline" as const, color: "text-muted-foreground" };
@@ -149,8 +168,8 @@ export function ContactActivityDialog({ open, onOpenChange, contact }: ContactAc
                           </div>
                         );
                       })}
-                    {events.filter((e) => filterType === "all" || e.event_type === filterType).length === 0 && (
-                      <div className="text-center text-muted-foreground py-8 text-sm">Nenhum evento deste tipo</div>
+                    {filteredEvents.filter((e) => filterType === "all" || e.event_type === filterType).length === 0 && (
+                      <div className="text-center text-muted-foreground py-8 text-sm">Nenhum evento neste período</div>
                     )}
                   </div>
                 )}
