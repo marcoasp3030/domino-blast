@@ -1,13 +1,30 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { AppLayout } from "@/components/layout/AppLayout";
+import { StatsCards } from "@/components/dashboard/StatsCards";
+import { CampaignPerformanceChart } from "@/components/dashboard/CampaignPerformanceChart";
+import { RecentCampaigns } from "@/components/dashboard/RecentCampaigns";
+import { EventBreakdown } from "@/components/dashboard/EventBreakdown";
 
 const Index = () => {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
+    <AppLayout>
+      <div className="page-header">
+        <h1 className="page-title">Dashboard</h1>
+        <p className="page-description">Visão geral das suas campanhas de email marketing</p>
       </div>
-    </div>
+
+      <StatsCards />
+
+      <div className="mt-8 grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <CampaignPerformanceChart />
+        </div>
+        <EventBreakdown />
+      </div>
+
+      <div className="mt-6">
+        <RecentCampaigns />
+      </div>
+    </AppLayout>
   );
 };
 
