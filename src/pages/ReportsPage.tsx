@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { EventContactsPanel } from "@/components/reports/EventContactsPanel";
 import { EventTimelineChart } from "@/components/reports/EventTimelineChart";
+import { Eye, MousePointerClick, AlertTriangle, Mail } from "lucide-react";
 
 export default function ReportsPage() {
   const { companyId } = useAuth();
@@ -29,11 +30,27 @@ export default function ReportsPage() {
     enabled: !!companyId,
   });
 
+  const delivered = eventCounts?.delivered || 0;
+  const opens = eventCounts?.open || 0;
+  const clicks = eventCounts?.click || 0;
+  const bounces = eventCounts?.bounce || 0;
+
+  const openRate = delivered > 0 ? ((opens / delivered) * 100).toFixed(1) : "0.0";
+  const clickRate = delivered > 0 ? ((clicks / delivered) * 100).toFixed(1) : "0.0";
+  const bounceRate = delivered > 0 ? ((bounces / delivered) * 100).toFixed(1) : "0.0";
+
+  const rateCards = [
+    { label: "Entregas", value: delivered.toLocaleString("pt-BR"), icon: Mail, color: "hsl(152, 69%, 40%)", bg: "bg-emerald-100 dark:bg-emerald-900/30" },
+    { label: "Taxa de Abertura", value: `${openRate}%`, sub: `${opens.toLocaleString("pt-BR")} aberturas`, icon: Eye, color: "hsl(262, 83%, 58%)", bg: "bg-violet-100 dark:bg-violet-900/30" },
+    { label: "Taxa de Clique", value: `${clickRate}%`, sub: `${clicks.toLocaleString("pt-BR")} cliques`, icon: MousePointerClick, color: "hsl(38, 92%, 50%)", bg: "bg-amber-100 dark:bg-amber-900/30" },
+    { label: "Taxa de Bounce", value: `${bounceRate}%`, sub: `${bounces.toLocaleString("pt-BR")} bounces`, icon: AlertTriangle, color: "hsl(0, 72%, 51%)", bg: "bg-red-100 dark:bg-red-900/30" },
+  ];
+
   const chartData = [
-    { name: "Entregues", value: eventCounts?.delivered || 0, fill: "hsl(152, 69%, 40%)" },
-    { name: "Abertos", value: eventCounts?.open || 0, fill: "hsl(262, 83%, 58%)" },
-    { name: "Clicados", value: eventCounts?.click || 0, fill: "hsl(38, 92%, 50%)" },
-    { name: "Bounces", value: eventCounts?.bounce || 0, fill: "hsl(0, 72%, 51%)" },
+    { name: "Entregues", value: delivered, fill: "hsl(152, 69%, 40%)" },
+    { name: "Abertos", value: opens, fill: "hsl(262, 83%, 58%)" },
+    { name: "Clicados", value: clicks, fill: "hsl(38, 92%, 50%)" },
+    { name: "Bounces", value: bounces, fill: "hsl(0, 72%, 51%)" },
     { name: "Spam", value: eventCounts?.spam || 0, fill: "hsl(350, 80%, 55%)" },
     { name: "Unsub", value: eventCounts?.unsubscribe || 0, fill: "hsl(220, 10%, 46%)" },
   ];
@@ -45,6 +62,24 @@ export default function ReportsPage() {
       <div className="page-header">
         <h1 className="page-title">Relatórios</h1>
         <p className="page-description">Análise detalhada de performance</p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+        {rateCards.map((card) => {
+          const Icon = card.icon;
+          return (
+            <div key={card.label} className="rounded-xl border border-border bg-card p-4">
+              <div className="flex items-center gap-3 mb-3">
+                <div className={`rounded-lg p-2 ${card.bg}`}>
+                  <Icon className="h-4 w-4" style={{ color: card.color }} />
+                </div>
+                <span className="text-sm text-muted-foreground">{card.label}</span>
+              </div>
+              <p className="text-2xl font-bold tracking-tight">{card.value}</p>
+              {card.sub && <p className="text-xs text-muted-foreground mt-1">{card.sub}</p>}
+            </div>
+          );
+        })}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
