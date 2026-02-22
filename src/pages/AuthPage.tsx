@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Mail, Lock, User, Building2 } from "lucide-react";
 import { toast } from "sonner";
+import nutricarLogo from "@/assets/nutricar-logo.webp";
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -52,10 +53,8 @@ export default function AuthPage() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl" style={{ background: "var(--gradient-primary)" }}>
-            <Mail className="h-7 w-7 text-primary-foreground" />
-          </div>
-          <h1 className="text-2xl font-bold">MailPulse</h1>
+          <img src={nutricarLogo} alt="Nutricar Brasil" className="mx-auto mb-4 h-16 object-contain" />
+          <h1 className="text-2xl font-bold">Nutricar Brasil</h1>
           <p className="text-sm text-muted-foreground mt-1">
             {isLogin ? "Entre na sua conta" : "Crie sua conta"}
           </p>
@@ -95,13 +94,13 @@ export default function AuthPage() {
             </div>
           </div>
 
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button type="submit" className="w-full" style={{ background: "#88BE46", color: "#fff" }} disabled={loading}>
             {loading ? "Carregando..." : isLogin ? "Entrar" : "Criar conta"}
           </Button>
 
           <p className="text-center text-sm text-muted-foreground">
             {isLogin ? "Não tem conta?" : "Já tem conta?"}{" "}
-            <button type="button" onClick={() => setIsLogin(!isLogin)} className="font-medium text-primary hover:underline">
+            <button type="button" onClick={() => setIsLogin(!isLogin)} className="font-medium hover:underline" style={{ color: "#88BE46" }}>
               {isLogin ? "Cadastre-se" : "Faça login"}
             </button>
           </p>

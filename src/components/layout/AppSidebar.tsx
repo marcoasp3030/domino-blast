@@ -1,11 +1,12 @@
 import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Users, ListFilter, Palette, Send, Globe,
-  BarChart3, Settings, Mail, ChevronLeft, ChevronRight, LogOut,
+  BarChart3, Settings, ChevronLeft, ChevronRight, LogOut,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import nutricarLogo from "@/assets/nutricar-logo.webp";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
@@ -39,12 +40,10 @@ export function AppSidebar() {
       style={{ background: "hsl(var(--sidebar-background))", borderColor: "hsl(var(--sidebar-border))" }}
     >
       <div className="flex h-16 items-center gap-3 px-4 border-b" style={{ borderColor: "hsl(var(--sidebar-border))" }}>
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style={{ background: "var(--gradient-primary)" }}>
-          <Mail className="h-5 w-5" style={{ color: "hsl(var(--sidebar-primary-foreground))" }} />
-        </div>
+        <img src={nutricarLogo} alt="Nutricar" className="h-9 w-9 shrink-0 rounded-lg object-contain" />
         {!collapsed && (
           <div className="animate-slide-in-left">
-            <h1 className="text-base font-bold" style={{ color: "hsl(var(--sidebar-accent-foreground))" }}>MailPulse</h1>
+            <h1 className="text-base font-bold" style={{ color: "hsl(var(--sidebar-accent-foreground))" }}>Nutricar</h1>
             <p className="text-[11px]" style={{ color: "hsl(var(--sidebar-foreground))" }}>Email Marketing</p>
           </div>
         )}
