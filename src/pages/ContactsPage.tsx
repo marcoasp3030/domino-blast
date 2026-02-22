@@ -14,6 +14,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { CsvImportDialog } from "@/components/contacts/CsvImportDialog";
 import { ContactActivityDialog } from "@/components/contacts/ContactActivityDialog";
 import { useContactTags, useTags, ContactTagBadges, ContactTagPicker, TagManagerDialog } from "@/components/contacts/ContactTags";
+import { BulkTagPicker } from "@/components/contacts/BulkTagPicker";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -280,6 +281,7 @@ export default function ContactsPage() {
       {someSelected && (
         <div className="flex items-center gap-3 mb-4 p-3 rounded-lg border border-border bg-muted/50">
           <span className="text-sm font-medium">{selectedIds.size} selecionado(s)</span>
+          <BulkTagPicker selectedIds={selectedIds} />
           <Button variant="destructive" size="sm" className="gap-2" onClick={() => setBulkDeleteOpen(true)}>
             <Trash2 className="h-4 w-4" /> Excluir selecionados
           </Button>
