@@ -1,6 +1,6 @@
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Send, Loader2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -42,6 +42,26 @@ export default function CampaignsPage() {
     },
     onError: (e: any) => toast.error(e.message),
   });
+
+  const [sendingId, setSendingId] = useState<string | null>(null);
+
+  const sendCampaign = async (campaignId: string) => {
+    if (!confirm("Tem certeza que deseja enviar esta campanha agora? Os emails serão enviados via SendGrid.")) return;
+    setSendingId(campaignId);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-campaign", {
+        body: { campaign_id: campaignId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success(`Campanha enviada! ${data.sent} emails enviados, ${data.failed} falharam.`);
+      queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao enviar campanha");
+    } finally {
+      setSendingId(null);
+    }
+  };
 
   return (
     <AppLayout>
@@ -87,9 +107,21 @@ export default function CampaignsPage() {
                     <p className="font-semibold">{new Date(c.created_at).toLocaleDateString("pt-BR")}</p>
                   </div>
                   {c.status === "draft" && (
-                    <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive h-8 w-8 p-0" onClick={() => { if (confirm("Excluir esta campanha?")) deleteCampaign.mutate(c.id); }}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="default" className="gap-1.5 h-8" onClick={() => sendCampaign(c.id)} disabled={sendingId === c.id}>
+                        {sendingId === c.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                        {sendingId === c.id ? "Enviando..." : "Enviar"}
+                      </Button>
+                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive h-8 w-8 p-0" onClick={() => { if (confirm("Excluir esta campanha?")) deleteCampaign.mutate(c.id); }}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                  {c.status === "sending" && (
+                    <div className="flex items-center gap-1.5 text-primary">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-xs font-medium">Enviando...</span>
+                    </div>
                   )}
                 </div>
               </div>
