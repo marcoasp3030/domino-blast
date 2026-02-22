@@ -67,20 +67,47 @@ export default function ContactsPage() {
     queryClient.invalidateQueries({ queryKey: ["contacts-count"] });
   };
 
-  const { data: totalCount = 0 } = useQuery({
-    queryKey: ["contacts-count", companyId, search, statusFilter],
+  // Helper: get contact IDs matching tag filter
+  const { data: tagFilteredIds } = useQuery({
+    queryKey: ["contacts-by-tag", tagFilter],
     queryFn: async () => {
-      let q = supabase.from("contacts").select("*", { count: "exact", head: true });
-      if (search) q = q.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
-      if (statusFilter !== "all") q = q.eq("status", statusFilter as ContactStatus);
-      const { count } = await q;
-      return count || 0;
+      if (tagFilter === "all") return null;
+      const { data } = await supabase
+        .from("contact_tags")
+        .select("contact_id")
+        .eq("tag_id", tagFilter);
+      return (data || []).map((r) => r.contact_id);
     },
     enabled: !!companyId,
   });
 
+  // When tag filter is active but no contacts match, use impossible ID to get 0 results
+  const applyTagFilter = (q: any) => {
+    if (tagFilter !== "all" && tagFilteredIds !== null && tagFilteredIds !== undefined) {
+      if (tagFilteredIds.length === 0) {
+        q = q.in("id", ["00000000-0000-0000-0000-000000000000"]);
+      } else {
+        q = q.in("id", tagFilteredIds);
+      }
+    }
+    return q;
+  };
+
+  const { data: totalCount = 0 } = useQuery({
+    queryKey: ["contacts-count", companyId, search, statusFilter, tagFilter, tagFilteredIds],
+    queryFn: async () => {
+      let q = supabase.from("contacts").select("*", { count: "exact", head: true });
+      if (search) q = q.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
+      if (statusFilter !== "all") q = q.eq("status", statusFilter as ContactStatus);
+      q = applyTagFilter(q);
+      const { count } = await q;
+      return count || 0;
+    },
+    enabled: !!companyId && (tagFilter === "all" || tagFilteredIds !== undefined),
+  });
+
   const { data: contacts = [], isLoading } = useQuery({
-    queryKey: ["contacts", companyId, search, page, pageSize, statusFilter],
+    queryKey: ["contacts", companyId, search, page, pageSize, statusFilter, tagFilter, tagFilteredIds],
     queryFn: async () => {
       let q = supabase
         .from("contacts")
@@ -89,10 +116,11 @@ export default function ContactsPage() {
         .range(page * pageSize, (page + 1) * pageSize - 1);
       if (search) q = q.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
       if (statusFilter !== "all") q = q.eq("status", statusFilter as ContactStatus);
+      q = applyTagFilter(q);
       const { data } = await q;
       return data || [];
     },
-    enabled: !!companyId,
+    enabled: !!companyId && (tagFilter === "all" || tagFilteredIds !== undefined),
   });
 
   // Fetch tags for current page contacts
@@ -307,7 +335,7 @@ export default function ContactsPage() {
             ) : contacts.length === 0 ? (
               <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">Nenhum contato encontrado</td></tr>
             ) : (
-              contacts.filter((c) => tagFilter === "all" || (contactTagsMap[c.id] || []).some((t) => t.id === tagFilter)).map((c) => (
+              contacts.map((c) => (
                 <tr key={c.id} className={`border-t border-border hover:bg-muted/50 transition-colors cursor-pointer ${selectedIds.has(c.id) ? "bg-muted/40" : ""}`} onClick={() => setActivityContact({ id: c.id, name: c.name, email: c.email })}>
                   <td className="px-3 py-4" onClick={(e) => e.stopPropagation()}>
                     <Checkbox checked={selectedIds.has(c.id)} onCheckedChange={() => toggleSelect(c.id)} aria-label={`Selecionar ${c.name || c.email}`} />
