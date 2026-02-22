@@ -2,105 +2,129 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Upload, Plus, Search, Filter, MoreHorizontal } from "lucide-react";
-
-const contacts = [
-  { name: "João Silva", email: "joao@empresa.com", tags: ["cliente", "premium"], status: "Ativo", origin: "Importação", date: "15/01/2026" },
-  { name: "Maria Santos", email: "maria@tech.io", tags: ["lead"], status: "Ativo", origin: "Formulário", date: "20/01/2026" },
-  { name: "Carlos Oliveira", email: "carlos@startup.com", tags: ["trial"], status: "Ativo", origin: "API", date: "01/02/2026" },
-  { name: "Ana Costa", email: "ana@digital.com", tags: ["cliente"], status: "Descadastrado", origin: "Importação", date: "10/12/2025" },
-  { name: "Pedro Lima", email: "pedro@agencia.com", tags: ["parceiro", "ativo"], status: "Ativo", origin: "Manual", date: "05/02/2026" },
-  { name: "Fernanda Souza", email: "fer@ecommerce.com", tags: ["lead", "nurturing"], status: "Ativo", origin: "Landing Page", date: "18/02/2026" },
-  { name: "Ricardo Mendes", email: "ricardo@corp.com.br", tags: ["enterprise"], status: "Bounced", origin: "Importação", date: "22/11/2025" },
-  { name: "Luciana Alves", email: "lu@marketing.com", tags: ["cliente"], status: "Ativo", origin: "Formulário", date: "14/02/2026" },
-];
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useState } from "react";
+import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 const statusClass: Record<string, string> = {
-  Ativo: "badge-success",
-  Descadastrado: "badge-warning",
-  Bounced: "badge-danger",
-  Inativo: "badge-neutral",
+  active: "badge-success",
+  inactive: "badge-neutral",
+  unsubscribed: "badge-warning",
+  bounced: "badge-danger",
+};
+const statusLabel: Record<string, string> = {
+  active: "Ativo",
+  inactive: "Inativo",
+  unsubscribed: "Descadastrado",
+  bounced: "Bounced",
 };
 
 export default function ContactsPage() {
+  const { companyId } = useAuth();
+  const queryClient = useQueryClient();
+  const [search, setSearch] = useState("");
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ name: "", email: "", phone: "", origin: "Manual" });
+
+  const { data: contacts = [], isLoading } = useQuery({
+    queryKey: ["contacts", companyId, search],
+    queryFn: async () => {
+      let q = supabase.from("contacts").select("*").order("created_at", { ascending: false }).limit(50);
+      if (search) q = q.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
+      const { data } = await q;
+      return data || [];
+    },
+    enabled: !!companyId,
+  });
+
+  const addContact = useMutation({
+    mutationFn: async () => {
+      if (!companyId) throw new Error("No company");
+      const { error } = await supabase.from("contacts").insert({
+        company_id: companyId,
+        name: form.name,
+        email: form.email,
+        phone: form.phone || null,
+        origin: form.origin,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["contacts"] });
+      toast.success("Contato adicionado!");
+      setOpen(false);
+      setForm({ name: "", email: "", phone: "", origin: "Manual" });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
   return (
     <AppLayout>
       <div className="page-header flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="page-title">Contatos</h1>
-          <p className="page-description">Gerencie sua base de contatos e leads</p>
+          <p className="page-description">Gerencie sua base de contatos e leads ({contacts.length})</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="gap-2">
-            <Upload className="h-4 w-4" /> Importar
-          </Button>
-          <Button size="sm" className="gap-2">
-            <Plus className="h-4 w-4" /> Novo Contato
-          </Button>
+          <Button variant="outline" size="sm" className="gap-2"><Upload className="h-4 w-4" /> Importar</Button>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="gap-2"><Plus className="h-4 w-4" /> Novo Contato</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Novo Contato</DialogTitle></DialogHeader>
+              <form onSubmit={(e) => { e.preventDefault(); addContact.mutate(); }} className="space-y-4">
+                <div><Label>Nome</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required className="mt-1" /></div>
+                <div><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required className="mt-1" /></div>
+                <div><Label>Telefone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="mt-1" /></div>
+                <Button type="submit" disabled={addContact.isPending} className="w-full">{addContact.isPending ? "Salvando..." : "Adicionar"}</Button>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
-      {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar por nome ou email..." className="pl-9" />
+          <Input placeholder="Buscar por nome ou email..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
-        <Button variant="outline" size="sm" className="gap-2">
-          <Filter className="h-4 w-4" /> Filtros
-        </Button>
       </div>
 
-      {/* Table */}
       <div className="rounded-xl border border-border bg-card overflow-x-auto">
         <table className="data-table">
           <thead>
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Contato</th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Tags</th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Status</th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Origem</th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Cadastro</th>
-              <th className="px-6 py-3 w-10"></th>
             </tr>
           </thead>
           <tbody>
-            {contacts.map((c, i) => (
-              <tr key={i} className="border-t border-border hover:bg-muted/50 transition-colors cursor-pointer">
-                <td className="px-6 py-4">
-                  <div>
-                    <p className="font-medium">{c.name}</p>
+            {isLoading ? (
+              <tr><td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">Carregando...</td></tr>
+            ) : contacts.length === 0 ? (
+              <tr><td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">Nenhum contato encontrado</td></tr>
+            ) : (
+              contacts.map((c) => (
+                <tr key={c.id} className="border-t border-border hover:bg-muted/50 transition-colors cursor-pointer">
+                  <td className="px-6 py-4">
+                    <p className="font-medium">{c.name || "-"}</p>
                     <p className="text-sm text-muted-foreground">{c.email}</p>
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex flex-wrap gap-1">
-                    {c.tags.map((tag) => (
-                      <span key={tag} className="badge-info">{tag}</span>
-                    ))}
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  <span className={statusClass[c.status] || "badge-neutral"}>{c.status}</span>
-                </td>
-                <td className="px-6 py-4 text-sm text-muted-foreground">{c.origin}</td>
-                <td className="px-6 py-4 text-sm text-muted-foreground">{c.date}</td>
-                <td className="px-6 py-4">
-                  <button className="p-1 rounded hover:bg-muted transition-colors">
-                    <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-                  </button>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="px-6 py-4"><span className={statusClass[c.status] || "badge-neutral"}>{statusLabel[c.status] || c.status}</span></td>
+                  <td className="px-6 py-4 text-sm text-muted-foreground">{c.origin || "-"}</td>
+                  <td className="px-6 py-4 text-sm text-muted-foreground">{new Date(c.created_at).toLocaleDateString("pt-BR")}</td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
-      </div>
-
-      <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-        <span>Mostrando 1-8 de 1.247 contatos</span>
-        <div className="flex gap-1">
-          <Button variant="outline" size="sm" disabled>Anterior</Button>
-          <Button variant="outline" size="sm">Próximo</Button>
-        </div>
       </div>
     </AppLayout>
   );
