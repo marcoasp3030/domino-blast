@@ -1,7 +1,7 @@
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Upload, Plus, Search, ChevronLeft, ChevronRight, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Upload, Plus, Search, ChevronLeft, ChevronRight, MoreHorizontal, Pencil, Trash2, Download } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -182,6 +182,28 @@ export default function ContactsPage() {
   const allSelected = contacts.length > 0 && contacts.every((c) => selectedIds.has(c.id));
   const someSelected = selectedIds.size > 0;
 
+  const exportCsv = async () => {
+    toast.info("Exportando contatos...");
+    let q = supabase.from("contacts").select("name, email, phone, status, origin, created_at").order("created_at", { ascending: false });
+    if (search) q = q.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
+    if (statusFilter !== "all") q = q.eq("status", statusFilter as ContactStatus);
+    const { data } = await q.limit(5000);
+    if (!data || data.length === 0) { toast.error("Nenhum contato para exportar"); return; }
+    const header = "Nome,Email,Telefone,Status,Origem,Cadastro\n";
+    const rows = data.map((c) =>
+      [c.name || "", c.email, c.phone || "", statusLabel[c.status] || c.status, c.origin || "", new Date(c.created_at).toLocaleDateString("pt-BR")]
+        .map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")
+    ).join("\n");
+    const blob = new Blob([header + rows], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `contatos${statusFilter !== "all" ? `-${statusFilter}` : ""}${search ? `-${search}` : ""}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`${data.length} contatos exportados!`);
+  };
+
   return (
     <AppLayout>
       <div className="page-header flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -190,6 +212,7 @@ export default function ContactsPage() {
           <p className="page-description">Gerencie sua base de contatos e leads ({totalCount})</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="gap-2" onClick={exportCsv}><Download className="h-4 w-4" /> Exportar</Button>
           <Button variant="outline" size="sm" className="gap-2" onClick={() => setImportOpen(true)}><Upload className="h-4 w-4" /> Importar</Button>
           <CsvImportDialog open={importOpen} onOpenChange={setImportOpen} />
           <Dialog open={open} onOpenChange={setOpen}>
