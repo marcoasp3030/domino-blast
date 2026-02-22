@@ -1,9 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { decode as decodeBase64 } from "https://deno.land/std@0.208.0/encoding/base64.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-twilio-email-event-webhook-signature, x-twilio-email-event-webhook-timestamp",
 };
 
 const eventTypeMap: Record<string, string> = {
@@ -16,18 +17,79 @@ const eventTypeMap: Record<string, string> = {
   dropped: "dropped",
 };
 
+async function importPublicKey(base64Key: string): Promise<CryptoKey> {
+  const keyData = decodeBase64(base64Key);
+  return crypto.subtle.importKey(
+    "spki",
+    keyData,
+    { name: "ECDSA", namedCurve: "P-256" },
+    false,
+    ["verify"]
+  );
+}
+
+async function verifySignature(
+  publicKey: CryptoKey,
+  payload: string,
+  signature: string,
+  timestamp: string
+): Promise<boolean> {
+  const signedContent = timestamp + payload;
+  const signatureBytes = decodeBase64(signature);
+  const encoder = new TextEncoder();
+  return crypto.subtle.verify(
+    { name: "ECDSA", hash: "SHA-256" },
+    publicKey,
+    signatureBytes,
+    encoder.encode(signedContent)
+  );
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    // Signature verification
+    const verificationKey = Deno.env.get("SENDGRID_WEBHOOK_VERIFICATION_KEY");
+    const rawBody = await req.text();
+
+    if (verificationKey) {
+      const signature = req.headers.get("x-twilio-email-event-webhook-signature");
+      const timestamp = req.headers.get("x-twilio-email-event-webhook-timestamp");
+
+      if (!signature || !timestamp) {
+        return new Response(JSON.stringify({ error: "Missing signature headers" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      try {
+        const publicKey = await importPublicKey(verificationKey);
+        const isValid = await verifySignature(publicKey, rawBody, signature, timestamp);
+        if (!isValid) {
+          return new Response(JSON.stringify({ error: "Invalid signature" }), {
+            status: 403,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } catch (err) {
+        console.error("Signature verification failed:", err);
+        return new Response(JSON.stringify({ error: "Signature verification error" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const events = await req.json();
+    const events = JSON.parse(rawBody);
 
     if (!Array.isArray(events)) {
       return new Response(JSON.stringify({ error: "Expected array" }), {
