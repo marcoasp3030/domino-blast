@@ -1,4 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +13,7 @@ import {
   Save, MousePointerClick, Smartphone, Monitor, Copy,
   ListOrdered, Quote, Video, MapPin, Share2, Star, Clock, 
   Palette, AlignLeft, AlignCenter, AlignRight, ChevronDown, ChevronUp,
-  LayoutGrid, Heading1, Heading2, Link, Box, Layers, Timer
+  LayoutGrid, Heading1, Heading2, Link, Box, Layers, Timer, GripVertical
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -448,6 +451,117 @@ function BlockEditor({ block, onChange }: { block: Block; onChange: (c: Record<s
   return <p className="text-xs text-muted-foreground">Bloco sem editor</p>;
 }
 
+// ── Sortable Block Item ──
+function SortableBlockItem({ 
+  block, idx, selectedId, setSelectedId, blockLabel, moveBlock, duplicateBlock, removeBlock 
+}: {
+  block: Block; idx: number; selectedId: string | null;
+  setSelectedId: (id: string) => void;
+  blockLabel: (type: BlockType) => string;
+  moveBlock: (idx: number, dir: -1 | 1) => void;
+  duplicateBlock: (block: Block) => void;
+  removeBlock: (id: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 50 : undefined,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      onClick={() => setSelectedId(block.id)}
+      className={`group relative border-2 transition-colors cursor-pointer ${selectedId === block.id ? "border-primary" : "border-transparent hover:border-primary/30"}`}
+    >
+      {/* Drag handle */}
+      <div
+        {...attributes}
+        {...listeners}
+        className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-full opacity-0 group-hover:opacity-100 transition-opacity z-10 cursor-grab active:cursor-grabbing p-1 rounded-l-md bg-muted border border-r-0 border-border"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <GripVertical className="h-4 w-4 text-muted-foreground" />
+      </div>
+      {/* Block label */}
+      <div className="absolute left-0 -top-0.5 translate-y-[-100%] bg-primary text-primary-foreground px-2 py-0.5 text-[10px] font-medium rounded-t opacity-0 group-hover:opacity-100 transition-opacity z-10">
+        {blockLabel(block.type)}
+      </div>
+      {/* Actions */}
+      <div className="absolute -right-1 -top-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+        <button onClick={(e) => { e.stopPropagation(); moveBlock(idx, -1); }} className="rounded bg-card border border-border p-0.5 hover:bg-muted" title="Mover para cima"><ArrowUp className="h-3 w-3" /></button>
+        <button onClick={(e) => { e.stopPropagation(); moveBlock(idx, 1); }} className="rounded bg-card border border-border p-0.5 hover:bg-muted" title="Mover para baixo"><ArrowDown className="h-3 w-3" /></button>
+        <button onClick={(e) => { e.stopPropagation(); duplicateBlock(block); }} className="rounded bg-card border border-border p-0.5 hover:bg-muted" title="Duplicar"><Copy className="h-3 w-3" /></button>
+        <button onClick={(e) => { e.stopPropagation(); removeBlock(block.id); }} className="rounded bg-destructive/10 border border-destructive/20 p-0.5 hover:bg-destructive/20" title="Remover"><Trash2 className="h-3 w-3 text-destructive" /></button>
+      </div>
+      <div className="p-4" dangerouslySetInnerHTML={{ __html: blockToHtml(block) }} />
+    </div>
+  );
+}
+
+// ── DnD Canvas ──
+function DndCanvas({
+  blocks, setBlocks, selectedId, setSelectedId, emailSettings, blockLabel, moveBlock, duplicateBlock, removeBlock,
+}: {
+  blocks: Block[]; setBlocks: (b: Block[]) => void;
+  selectedId: string | null; setSelectedId: (id: string) => void;
+  emailSettings: { bodyBg: string; contentBg: string; contentWidth: string };
+  blockLabel: (type: BlockType) => string;
+  moveBlock: (idx: number, dir: -1 | 1) => void;
+  duplicateBlock: (block: Block) => void;
+  removeBlock: (id: string) => void;
+}) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const blockIds = useMemo(() => blocks.map(b => b.id), [blocks]);
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      const oldIndex = blocks.findIndex(b => b.id === active.id);
+      const newIndex = blocks.findIndex(b => b.id === over.id);
+      setBlocks(arrayMove(blocks, oldIndex, newIndex));
+    }
+  };
+
+  return (
+    <div className="flex-1 overflow-y-auto bg-muted/50 p-6">
+      <div className="mx-auto bg-card rounded-lg border border-border min-h-[400px]" style={{ maxWidth: `${emailSettings.contentWidth}px` }}>
+        {blocks.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-64 text-muted-foreground text-sm gap-2">
+            <Layers className="h-8 w-8 opacity-30" />
+            <p>Clique nos blocos à esquerda para adicionar</p>
+          </div>
+        ) : (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={blockIds} strategy={verticalListSortingStrategy}>
+              {blocks.map((block, idx) => (
+                <SortableBlockItem
+                  key={block.id}
+                  block={block}
+                  idx={idx}
+                  selectedId={selectedId}
+                  setSelectedId={setSelectedId}
+                  blockLabel={blockLabel}
+                  moveBlock={moveBlock}
+                  duplicateBlock={duplicateBlock}
+                  removeBlock={removeBlock}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
+        )}
+      </div>
+    </div>
+  );
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -614,37 +728,17 @@ export function TemplateEditorDialog({ open, onOpenChange, template }: Props) {
               </div>
 
               {/* Canvas */}
-              <div className="flex-1 overflow-y-auto bg-muted/50 p-6">
-                <div className="mx-auto bg-card rounded-lg border border-border min-h-[400px]" style={{ maxWidth: `${emailSettings.contentWidth}px` }}>
-                  {blocks.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-64 text-muted-foreground text-sm gap-2">
-                      <Layers className="h-8 w-8 opacity-30" />
-                      <p>Clique nos blocos à esquerda para adicionar</p>
-                    </div>
-                  ) : (
-                    blocks.map((block, idx) => (
-                      <div
-                        key={block.id}
-                        onClick={() => setSelectedId(block.id)}
-                        className={`group relative border-2 transition-colors cursor-pointer ${selectedId === block.id ? "border-primary" : "border-transparent hover:border-primary/30"}`}
-                      >
-                        {/* Block label */}
-                        <div className="absolute left-0 -top-0.5 translate-y-[-100%] bg-primary text-primary-foreground px-2 py-0.5 text-[10px] font-medium rounded-t opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                          {blockLabel(block.type)}
-                        </div>
-                        {/* Actions */}
-                        <div className="absolute -right-1 -top-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                          <button onClick={(e) => { e.stopPropagation(); moveBlock(idx, -1); }} className="rounded bg-card border border-border p-0.5 hover:bg-muted" title="Mover para cima"><ArrowUp className="h-3 w-3" /></button>
-                          <button onClick={(e) => { e.stopPropagation(); moveBlock(idx, 1); }} className="rounded bg-card border border-border p-0.5 hover:bg-muted" title="Mover para baixo"><ArrowDown className="h-3 w-3" /></button>
-                          <button onClick={(e) => { e.stopPropagation(); duplicateBlock(block); }} className="rounded bg-card border border-border p-0.5 hover:bg-muted" title="Duplicar"><Copy className="h-3 w-3" /></button>
-                          <button onClick={(e) => { e.stopPropagation(); removeBlock(block.id); }} className="rounded bg-destructive/10 border border-destructive/20 p-0.5 hover:bg-destructive/20" title="Remover"><Trash2 className="h-3 w-3 text-destructive" /></button>
-                        </div>
-                        <div className="p-4" dangerouslySetInnerHTML={{ __html: blockToHtml(block) }} />
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
+              <DndCanvas
+                blocks={blocks}
+                setBlocks={setBlocks}
+                selectedId={selectedId}
+                setSelectedId={setSelectedId}
+                emailSettings={emailSettings}
+                blockLabel={blockLabel}
+                moveBlock={moveBlock}
+                duplicateBlock={duplicateBlock}
+                removeBlock={removeBlock}
+              />
 
               {/* Properties panel */}
               <div className="w-72 border-l border-border flex-shrink-0 overflow-y-auto">
