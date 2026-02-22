@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { EventContactsPanel } from "@/components/reports/EventContactsPanel";
+import { EventTimelineChart } from "@/components/reports/EventTimelineChart";
 
 export default function ReportsPage() {
   const { companyId } = useAuth();
@@ -88,6 +89,10 @@ export default function ReportsPage() {
             </div>
           )}
         </div>
+      </div>
+
+      <div className="mt-6">
+        <EventTimelineChart />
       </div>
 
       <div className="mt-6">
