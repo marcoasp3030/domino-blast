@@ -100,11 +100,32 @@ export function EventTimelineChart() {
             <XAxis dataKey="day" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
             <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" allowDecimals={false} />
             <Tooltip
-              contentStyle={{
-                background: "hsl(var(--card))",
-                border: "1px solid hsl(var(--border))",
-                borderRadius: "8px",
-                fontSize: "13px",
+              content={({ active, payload, label }) => {
+                if (!active || !payload || payload.length === 0) return null;
+                const total = payload.reduce((sum, p) => sum + (Number(p.value) || 0), 0);
+                return (
+                  <div className="rounded-lg border border-border bg-card p-3 shadow-lg text-sm">
+                    <p className="font-semibold mb-2">{label}</p>
+                    <div className="space-y-1">
+                      {payload.filter(p => Number(p.value) > 0).map((p) => {
+                        const pct = total > 0 ? ((Number(p.value) / total) * 100).toFixed(1) : "0";
+                        return (
+                          <div key={p.dataKey} className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-1.5">
+                              <span className="h-2.5 w-2.5 rounded-full" style={{ background: p.color }} />
+                              <span className="text-muted-foreground">{p.name}</span>
+                            </div>
+                            <span className="font-medium tabular-nums">{p.value} <span className="text-muted-foreground font-normal">({pct}%)</span></span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-2 pt-2 border-t border-border flex justify-between text-xs text-muted-foreground">
+                      <span>Total</span>
+                      <span className="font-semibold text-foreground">{total}</span>
+                    </div>
+                  </div>
+                );
               }}
             />
             <Legend wrapperStyle={{ fontSize: "12px" }} />
