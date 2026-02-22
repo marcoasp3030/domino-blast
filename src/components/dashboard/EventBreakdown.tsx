@@ -30,9 +30,9 @@ export function EventBreakdown() {
   const { data: eventData = [] } = useQuery({
     queryKey: ["event-breakdown", companyId],
     queryFn: async () => {
-      const { data } = await supabase.from("events").select("event_type");
+      const { data } = await supabase.rpc("get_event_counts", { _company_id: companyId });
       const counts: Record<string, number> = {};
-      (data || []).forEach((e) => { counts[e.event_type] = (counts[e.event_type] || 0) + 1; });
+      (data || []).forEach((r: any) => { counts[r.event_type] = Number(r.count); });
       return Object.entries(counts).map(([name, value]) => ({
         name: labelMap[name] || name,
         value,
