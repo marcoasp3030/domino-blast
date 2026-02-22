@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,19 +21,48 @@ const STEPS = [
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  editCampaign?: any;
 }
 
-export function CampaignWizardDialog({ open, onOpenChange }: Props) {
+export function CampaignWizardDialog({ open, onOpenChange, editCampaign }: Props) {
   const { companyId, user } = useAuth();
   const queryClient = useQueryClient();
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({
+
+  const isEditing = !!editCampaign;
+
+  const defaultForm = {
     name: "", subject: "", preheader: "",
     template_id: "", list_id: "", sender_id: "",
     scheduled_at: "", send_now: true,
     utm_source: "", utm_medium: "email", utm_campaign: "",
-  });
+  };
+
+  const [form, setForm] = useState(defaultForm);
+
+  // Populate form when editing
+  React.useEffect(() => {
+    if (editCampaign && open) {
+      setForm({
+        name: editCampaign.name || "",
+        subject: editCampaign.subject || "",
+        preheader: editCampaign.preheader || "",
+        template_id: editCampaign.template_id || "",
+        list_id: editCampaign.list_id || "",
+        sender_id: editCampaign.sender_id || "",
+        scheduled_at: editCampaign.scheduled_at ? new Date(editCampaign.scheduled_at).toISOString().slice(0, 16) : "",
+        send_now: !editCampaign.scheduled_at,
+        utm_source: editCampaign.utm_source || "",
+        utm_medium: editCampaign.utm_medium || "email",
+        utm_campaign: editCampaign.utm_campaign || "",
+      });
+      setStep(0);
+    } else if (!open) {
+      setForm(defaultForm);
+      setStep(0);
+    }
+  }, [editCampaign, open]);
 
   const { data: templates = [] } = useQuery({
     queryKey: ["templates", companyId],
@@ -67,7 +96,7 @@ export function CampaignWizardDialog({ open, onOpenChange }: Props) {
       const selectedList = lists.find((l: any) => l.id === form.list_id);
       const totalRecipients = selectedList?.list_members?.length || 0;
 
-      const { error } = await supabase.from("campaigns").insert({
+      const payload = {
         company_id: companyId,
         created_by: user?.id,
         name: form.name,
@@ -82,13 +111,19 @@ export function CampaignWizardDialog({ open, onOpenChange }: Props) {
         utm_source: form.utm_source || null,
         utm_medium: form.utm_medium || null,
         utm_campaign: form.utm_campaign || form.name || null,
-      });
-      if (error) throw error;
+      };
+
+      if (isEditing) {
+        const { error } = await supabase.from("campaigns").update(payload).eq("id", editCampaign.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("campaigns").insert(payload);
+        if (error) throw error;
+      }
+
       queryClient.invalidateQueries({ queryKey: ["campaigns"] });
-      toast.success(status === "draft" ? "Rascunho salvo!" : "Campanha agendada!");
+      toast.success(isEditing ? "Campanha atualizada!" : status === "draft" ? "Rascunho salvo!" : "Campanha agendada!");
       onOpenChange(false);
-      setStep(0);
-      setForm({ name: "", subject: "", preheader: "", template_id: "", list_id: "", sender_id: "", scheduled_at: "", send_now: true, utm_source: "", utm_medium: "email", utm_campaign: "" });
     } catch (e: any) {
       toast.error(e.message);
     } finally {
@@ -100,7 +135,7 @@ export function CampaignWizardDialog({ open, onOpenChange }: Props) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Nova Campanha</DialogTitle>
+          <DialogTitle>{isEditing ? "Editar Campanha" : "Nova Campanha"}</DialogTitle>
         </DialogHeader>
 
         {/* Stepper */}
