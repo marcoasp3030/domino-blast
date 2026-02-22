@@ -1,23 +1,41 @@
-import { Badge } from "@/components/ui/badge";
-
-const campaigns = [
-  { name: "Black Friday 2025", status: "Concluída", sent: 5200, openRate: "42.1%", ctr: "12.3%", date: "20/02/2026" },
-  { name: "Newsletter Fevereiro", status: "Enviando", sent: 3100, openRate: "38.5%", ctr: "9.7%", date: "22/02/2026" },
-  { name: "Lançamento Produto X", status: "Agendada", sent: 0, openRate: "-", ctr: "-", date: "25/02/2026" },
-  { name: "Reengajamento Q1", status: "Rascunho", sent: 0, openRate: "-", ctr: "-", date: "-" },
-  { name: "Webinar Março", status: "Agendada", sent: 0, openRate: "-", ctr: "-", date: "01/03/2026" },
-];
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 const statusClass: Record<string, string> = {
-  Concluída: "badge-success",
-  Enviando: "badge-info",
-  Agendada: "badge-warning",
-  Rascunho: "badge-neutral",
-  Pausada: "badge-warning",
-  Erro: "badge-danger",
+  completed: "badge-success",
+  sending: "badge-info",
+  scheduled: "badge-warning",
+  draft: "badge-neutral",
+  paused: "badge-warning",
+  error: "badge-danger",
+};
+
+const statusLabel: Record<string, string> = {
+  completed: "Concluída",
+  sending: "Enviando",
+  scheduled: "Agendada",
+  draft: "Rascunho",
+  paused: "Pausada",
+  error: "Erro",
 };
 
 export function RecentCampaigns() {
+  const { companyId } = useAuth();
+
+  const { data: campaigns = [] } = useQuery({
+    queryKey: ["recent-campaigns", companyId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("campaigns")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5);
+      return data || [];
+    },
+    enabled: !!companyId,
+  });
+
   return (
     <div className="rounded-xl border border-border bg-card">
       <div className="flex items-center justify-between p-6 pb-4">
@@ -32,25 +50,29 @@ export function RecentCampaigns() {
             <tr className="border-t border-border">
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Campanha</th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Enviados</th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Abertura</th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">CTR</th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Destinatários</th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Data</th>
             </tr>
           </thead>
           <tbody>
-            {campaigns.map((c, i) => (
-              <tr key={i} className="border-t border-border hover:bg-muted/50 transition-colors cursor-pointer">
-                <td className="px-6 py-4 font-medium">{c.name}</td>
-                <td className="px-6 py-4">
-                  <span className={statusClass[c.status] || "badge-neutral"}>{c.status}</span>
+            {campaigns.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">
+                  Nenhuma campanha criada ainda
                 </td>
-                <td className="px-6 py-4 text-muted-foreground">{c.sent > 0 ? c.sent.toLocaleString() : "-"}</td>
-                <td className="px-6 py-4 text-muted-foreground">{c.openRate}</td>
-                <td className="px-6 py-4 text-muted-foreground">{c.ctr}</td>
-                <td className="px-6 py-4 text-muted-foreground">{c.date}</td>
               </tr>
-            ))}
+            ) : (
+              campaigns.map((c) => (
+                <tr key={c.id} className="border-t border-border hover:bg-muted/50 transition-colors cursor-pointer">
+                  <td className="px-6 py-4 font-medium">{c.name}</td>
+                  <td className="px-6 py-4">
+                    <span className={statusClass[c.status] || "badge-neutral"}>{statusLabel[c.status] || c.status}</span>
+                  </td>
+                  <td className="px-6 py-4 text-muted-foreground">{c.total_recipients || 0}</td>
+                  <td className="px-6 py-4 text-muted-foreground">{new Date(c.created_at).toLocaleDateString("pt-BR")}</td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
