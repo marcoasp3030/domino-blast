@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useState } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -48,6 +49,9 @@ export default function ContactsPage() {
   const [editContact, setEditContact] = useState<{ id: string; name: string; email: string; phone: string; status: string } | null>(null);
   // Delete state
   const [deleteContact, setDeleteContact] = useState<{ id: string; name: string | null; email: string } | null>(null);
+  // Bulk selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
 
   const handleSearch = (value: string) => {
     setSearch(value);
@@ -143,6 +147,41 @@ export default function ContactsPage() {
     onError: (e: any) => toast.error(e.message),
   });
 
+  const bulkDeleteMut = useMutation({
+    mutationFn: async () => {
+      const ids = Array.from(selectedIds);
+      if (!ids.length) throw new Error("Nenhum contato selecionado");
+      const { error } = await supabase.from("contacts").delete().in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      invalidateContacts();
+      toast.success(`${selectedIds.size} contato(s) excluído(s)!`);
+      setSelectedIds(new Set());
+      setBulkDeleteOpen(false);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (contacts.length > 0 && contacts.every((c) => selectedIds.has(c.id))) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(contacts.map((c) => c.id)));
+    }
+  };
+
+  const allSelected = contacts.length > 0 && contacts.every((c) => selectedIds.has(c.id));
+  const someSelected = selectedIds.size > 0;
+
   return (
     <AppLayout>
       <div className="page-header flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -189,10 +228,22 @@ export default function ContactsPage() {
         </Select>
       </div>
 
+      {/* Bulk action bar */}
+      {someSelected && (
+        <div className="flex items-center gap-3 mb-4 p-3 rounded-lg border border-border bg-muted/50">
+          <span className="text-sm font-medium">{selectedIds.size} selecionado(s)</span>
+          <Button variant="destructive" size="sm" className="gap-2" onClick={() => setBulkDeleteOpen(true)}>
+            <Trash2 className="h-4 w-4" /> Excluir selecionados
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>Limpar seleção</Button>
+        </div>
+      )}
+
       <div className="rounded-xl border border-border bg-card overflow-x-auto">
         <table className="data-table">
           <thead>
             <tr>
+              <th className="px-3 py-3 w-10"><Checkbox checked={allSelected} onCheckedChange={toggleSelectAll} aria-label="Selecionar todos" /></th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Contato</th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Status</th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Origem</th>
@@ -202,12 +253,15 @@ export default function ContactsPage() {
           </thead>
           <tbody>
             {isLoading ? (
-              <tr><td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">Carregando...</td></tr>
+              <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">Carregando...</td></tr>
             ) : contacts.length === 0 ? (
-              <tr><td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">Nenhum contato encontrado</td></tr>
+              <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">Nenhum contato encontrado</td></tr>
             ) : (
               contacts.map((c) => (
-                <tr key={c.id} className="border-t border-border hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => setActivityContact({ id: c.id, name: c.name, email: c.email })}>
+                <tr key={c.id} className={`border-t border-border hover:bg-muted/50 transition-colors cursor-pointer ${selectedIds.has(c.id) ? "bg-muted/40" : ""}`} onClick={() => setActivityContact({ id: c.id, name: c.name, email: c.email })}>
+                  <td className="px-3 py-4" onClick={(e) => e.stopPropagation()}>
+                    <Checkbox checked={selectedIds.has(c.id)} onCheckedChange={() => toggleSelect(c.id)} aria-label={`Selecionar ${c.name || c.email}`} />
+                  </td>
                   <td className="px-6 py-4">
                     <p className="font-medium">{c.name || "-"}</p>
                     <p className="text-sm text-muted-foreground">{c.email}</p>
@@ -313,6 +367,24 @@ export default function ContactsPage() {
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={() => deleteContactMut.mutate()} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {deleteContactMut.isPending ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Delete Confirmation */}
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir {selectedIds.size} contato(s)?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir {selectedIds.size} contato(s) selecionado(s)? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => bulkDeleteMut.mutate()} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {bulkDeleteMut.isPending ? "Excluindo..." : `Excluir ${selectedIds.size}`}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
