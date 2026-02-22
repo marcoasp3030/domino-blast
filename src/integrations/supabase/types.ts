@@ -14,16 +14,750 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      audit_log: {
+        Row: {
+          action: string
+          company_id: string
+          created_at: string
+          details: Json | null
+          entity_id: string | null
+          entity_type: string
+          id: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          company_id: string
+          created_at?: string
+          details?: Json | null
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          company_id?: string
+          created_at?: string
+          details?: Json | null
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaigns: {
+        Row: {
+          batch_delay_seconds: number | null
+          batch_size: number | null
+          company_id: string
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          list_id: string | null
+          name: string
+          preheader: string | null
+          scheduled_at: string | null
+          sender_id: string | null
+          sent_at: string | null
+          status: Database["public"]["Enums"]["campaign_status"]
+          subject: string | null
+          template_id: string | null
+          total_recipients: number | null
+          updated_at: string
+          utm_campaign: string | null
+          utm_medium: string | null
+          utm_source: string | null
+        }
+        Insert: {
+          batch_delay_seconds?: number | null
+          batch_size?: number | null
+          company_id: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          list_id?: string | null
+          name: string
+          preheader?: string | null
+          scheduled_at?: string | null
+          sender_id?: string | null
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["campaign_status"]
+          subject?: string | null
+          template_id?: string | null
+          total_recipients?: number | null
+          updated_at?: string
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+        }
+        Update: {
+          batch_delay_seconds?: number | null
+          batch_size?: number | null
+          company_id?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          list_id?: string | null
+          name?: string
+          preheader?: string | null
+          scheduled_at?: string | null
+          sender_id?: string | null
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["campaign_status"]
+          subject?: string | null
+          template_id?: string | null
+          total_recipients?: number | null
+          updated_at?: string
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaigns_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaigns_list_id_fkey"
+            columns: ["list_id"]
+            isOneToOne: false
+            referencedRelation: "lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaigns_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "senders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaigns_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "email_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      companies: {
+        Row: {
+          created_at: string
+          id: string
+          logo_url: string | null
+          name: string
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          logo_url?: string | null
+          name: string
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          logo_url?: string | null
+          name?: string
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
+      contact_tags: {
+        Row: {
+          contact_id: string
+          id: string
+          tag_id: string
+        }
+        Insert: {
+          contact_id: string
+          id?: string
+          tag_id: string
+        }
+        Update: {
+          contact_id?: string
+          id?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_tags_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_tags_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contacts: {
+        Row: {
+          company_id: string
+          company_name: string | null
+          created_at: string
+          email: string
+          id: string
+          lgpd_consent: boolean | null
+          lgpd_consent_date: string | null
+          name: string | null
+          origin: string | null
+          phone: string | null
+          status: Database["public"]["Enums"]["contact_status"]
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          company_name?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          lgpd_consent?: boolean | null
+          lgpd_consent_date?: string | null
+          name?: string | null
+          origin?: string | null
+          phone?: string | null
+          status?: Database["public"]["Enums"]["contact_status"]
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          company_name?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          lgpd_consent?: boolean | null
+          lgpd_consent_date?: string | null
+          name?: string | null
+          origin?: string | null
+          phone?: string | null
+          status?: Database["public"]["Enums"]["contact_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contacts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      domains: {
+        Row: {
+          company_id: string
+          created_at: string
+          dkim_status: Database["public"]["Enums"]["domain_status"]
+          dmarc_status: Database["public"]["Enums"]["domain_status"]
+          domain: string
+          id: string
+          overall_status: Database["public"]["Enums"]["domain_status"]
+          spf_status: Database["public"]["Enums"]["domain_status"]
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          dkim_status?: Database["public"]["Enums"]["domain_status"]
+          dmarc_status?: Database["public"]["Enums"]["domain_status"]
+          domain: string
+          id?: string
+          overall_status?: Database["public"]["Enums"]["domain_status"]
+          spf_status?: Database["public"]["Enums"]["domain_status"]
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          dkim_status?: Database["public"]["Enums"]["domain_status"]
+          dmarc_status?: Database["public"]["Enums"]["domain_status"]
+          domain?: string
+          id?: string
+          overall_status?: Database["public"]["Enums"]["domain_status"]
+          spf_status?: Database["public"]["Enums"]["domain_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "domains_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_templates: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          design_json: Json | null
+          html_content: string | null
+          id: string
+          name: string
+          preview_url: string | null
+          type: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          design_json?: Json | null
+          html_content?: string | null
+          id?: string
+          name: string
+          preview_url?: string | null
+          type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          design_json?: Json | null
+          html_content?: string | null
+          id?: string
+          name?: string
+          preview_url?: string | null
+          type?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          campaign_id: string | null
+          company_id: string
+          contact_id: string | null
+          event_type: Database["public"]["Enums"]["event_type"]
+          id: string
+          ip_address: string | null
+          send_id: string | null
+          sendgrid_message_id: string | null
+          timestamp: string
+          url: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          campaign_id?: string | null
+          company_id: string
+          contact_id?: string | null
+          event_type: Database["public"]["Enums"]["event_type"]
+          id?: string
+          ip_address?: string | null
+          send_id?: string | null
+          sendgrid_message_id?: string | null
+          timestamp?: string
+          url?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          campaign_id?: string | null
+          company_id?: string
+          contact_id?: string | null
+          event_type?: Database["public"]["Enums"]["event_type"]
+          id?: string
+          ip_address?: string | null
+          send_id?: string | null
+          sendgrid_message_id?: string | null
+          timestamp?: string
+          url?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "events_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "events_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "events_send_id_fkey"
+            columns: ["send_id"]
+            isOneToOne: false
+            referencedRelation: "sends"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      list_members: {
+        Row: {
+          added_at: string
+          contact_id: string
+          id: string
+          list_id: string
+        }
+        Insert: {
+          added_at?: string
+          contact_id: string
+          id?: string
+          list_id: string
+        }
+        Update: {
+          added_at?: string
+          contact_id?: string
+          id?: string
+          list_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "list_members_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "list_members_list_id_fkey"
+            columns: ["list_id"]
+            isOneToOne: false
+            referencedRelation: "lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lists: {
+        Row: {
+          company_id: string
+          created_at: string
+          description: string | null
+          filter_criteria: Json | null
+          id: string
+          name: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          description?: string | null
+          filter_criteria?: Json | null
+          id?: string
+          name: string
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          filter_criteria?: Json | null
+          id?: string
+          name?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lists_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          company_id: string
+          created_at: string
+          full_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          company_id: string
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          company_id?: string
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      senders: {
+        Row: {
+          company_id: string
+          created_at: string
+          domain_id: string | null
+          from_email: string
+          from_name: string
+          id: string
+          is_default: boolean | null
+          reply_to: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          domain_id?: string | null
+          from_email: string
+          from_name: string
+          id?: string
+          is_default?: boolean | null
+          reply_to?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          domain_id?: string | null
+          from_email?: string
+          from_name?: string
+          id?: string
+          is_default?: boolean | null
+          reply_to?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "senders_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "senders_domain_id_fkey"
+            columns: ["domain_id"]
+            isOneToOne: false
+            referencedRelation: "domains"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sends: {
+        Row: {
+          campaign_id: string
+          contact_id: string
+          created_at: string
+          error_message: string | null
+          id: string
+          retry_count: number | null
+          sendgrid_message_id: string | null
+          sent_at: string | null
+          status: Database["public"]["Enums"]["send_status"]
+        }
+        Insert: {
+          campaign_id: string
+          contact_id: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          retry_count?: number | null
+          sendgrid_message_id?: string | null
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["send_status"]
+        }
+        Update: {
+          campaign_id?: string
+          contact_id?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          retry_count?: number | null
+          sendgrid_message_id?: string | null
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["send_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sends_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sends_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      suppressions: {
+        Row: {
+          company_id: string
+          created_at: string
+          email: string
+          id: string
+          reason: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          email: string
+          id?: string
+          reason?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          email?: string
+          id?: string
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "suppressions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tags: {
+        Row: {
+          color: string | null
+          company_id: string
+          id: string
+          name: string
+        }
+        Insert: {
+          color?: string | null
+          company_id: string
+          id?: string
+          name: string
+        }
+        Update: {
+          color?: string | null
+          company_id?: string
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tags_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_company_id: { Args: { _user_id: string }; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "marketing" | "readonly"
+      campaign_status:
+        | "draft"
+        | "scheduled"
+        | "sending"
+        | "completed"
+        | "paused"
+        | "error"
+      contact_status: "active" | "inactive" | "unsubscribed" | "bounced"
+      domain_status: "pending" | "validating" | "validated" | "error"
+      event_type:
+        | "delivered"
+        | "open"
+        | "click"
+        | "bounce"
+        | "spam"
+        | "unsubscribe"
+        | "dropped"
+      send_status: "queued" | "sent" | "delivered" | "failed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +884,28 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "marketing", "readonly"],
+      campaign_status: [
+        "draft",
+        "scheduled",
+        "sending",
+        "completed",
+        "paused",
+        "error",
+      ],
+      contact_status: ["active", "inactive", "unsubscribed", "bounced"],
+      domain_status: ["pending", "validating", "validated", "error"],
+      event_type: [
+        "delivered",
+        "open",
+        "click",
+        "bounce",
+        "spam",
+        "unsubscribe",
+        "dropped",
+      ],
+      send_status: ["queued", "sent", "delivered", "failed"],
+    },
   },
 } as const
