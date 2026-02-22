@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ChevronLeft, ChevronRight, Download, Mail, MousePointerClick, Eye, AlertTriangle, ShieldAlert, UserMinus, CalendarDays } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Download, Mail, MousePointerClick, Eye, AlertTriangle, ShieldAlert, UserMinus, CalendarDays, Megaphone } from "lucide-react";
 import { subDays } from "date-fns";
 
 const PERIOD_OPTIONS = [
@@ -37,6 +37,7 @@ export function EventContactsPanel() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [period, setPeriod] = useState("30");
+  const [campaignFilter, setCampaignFilter] = useState("all");
 
   const periodStart = period !== "all" ? subDays(new Date(), Number(period)).toISOString() : null;
 
@@ -45,6 +46,23 @@ export function EventContactsPanel() {
     return q;
   };
 
+  const applyCampaign = (q: any) => {
+    if (campaignFilter !== "all") q = q.eq("campaign_id", campaignFilter);
+    return q;
+  };
+
+  const { data: campaignsList = [] } = useQuery({
+    queryKey: ["campaigns-filter-list", companyId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("campaigns")
+        .select("id, name")
+        .order("name");
+      return data || [];
+    },
+    enabled: !!companyId,
+  });
+
   const handleTabChange = (v: string) => {
     setActiveTab(v);
     setSearch("");
@@ -52,13 +70,14 @@ export function EventContactsPanel() {
   };
 
   const { data: totalCount = 0 } = useQuery({
-    queryKey: ["event-contacts-count", companyId, activeTab, search, period],
+    queryKey: ["event-contacts-count", companyId, activeTab, search, period, campaignFilter],
     queryFn: async () => {
       let q = supabase
         .from("events")
         .select("contact_id, contacts!inner(name, email)", { count: "exact", head: true })
         .eq("event_type", activeTab as EventType);
       q = applyPeriod(q);
+      q = applyCampaign(q);
 
       if (search) {
         q = q.or(`name.ilike.%${search}%,email.ilike.%${search}%`, { referencedTable: "contacts" });
@@ -71,7 +90,7 @@ export function EventContactsPanel() {
   });
 
   const { data: contacts = [], isLoading } = useQuery({
-    queryKey: ["event-contacts", companyId, activeTab, search, page, period],
+    queryKey: ["event-contacts", companyId, activeTab, search, page, period, campaignFilter],
     queryFn: async () => {
       let q = supabase
         .from("events")
@@ -79,6 +98,7 @@ export function EventContactsPanel() {
         .eq("event_type", activeTab as EventType)
         .order("timestamp", { ascending: false });
       q = applyPeriod(q);
+      q = applyCampaign(q);
       q = q.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
       if (search) {
@@ -123,6 +143,7 @@ export function EventContactsPanel() {
       .eq("event_type", activeTab as EventType)
       .order("timestamp", { ascending: false });
     q = applyPeriod(q);
+    q = applyCampaign(q);
     q = q.limit(5000);
 
     if (search) {
@@ -171,6 +192,18 @@ export function EventContactsPanel() {
               <SelectContent>
                 {PERIOD_OPTIONS.map((o) => (
                   <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={campaignFilter} onValueChange={(v) => { setCampaignFilter(v); setPage(0); }}>
+              <SelectTrigger className="h-8 w-[180px] text-sm">
+                <Megaphone className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                <SelectValue placeholder="Todas campanhas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas campanhas</SelectItem>
+                {campaignsList.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
