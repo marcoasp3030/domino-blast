@@ -1,13 +1,15 @@
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Upload, Plus, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Upload, Plus, Search, ChevronLeft, ChevronRight, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { CsvImportDialog } from "@/components/contacts/CsvImportDialog";
 import { ContactActivityDialog } from "@/components/contacts/ContactActivityDialog";
 import { Label } from "@/components/ui/label";
@@ -28,6 +30,8 @@ const statusLabel: Record<string, string> = {
   bounced: "Bounced",
 };
 
+type ContactStatus = "active" | "inactive" | "unsubscribed" | "bounced";
+
 export default function ContactsPage() {
   const { companyId } = useAuth();
   const queryClient = useQueryClient();
@@ -40,15 +44,21 @@ export default function ContactsPage() {
   const [pageSize, setPageSize] = useState(25);
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
-  type ContactStatus = "active" | "inactive" | "unsubscribed" | "bounced";
+  // Edit state
+  const [editContact, setEditContact] = useState<{ id: string; name: string; email: string; phone: string; status: string } | null>(null);
+  // Delete state
+  const [deleteContact, setDeleteContact] = useState<{ id: string; name: string | null; email: string } | null>(null);
 
-  // Reset page when search changes
   const handleSearch = (value: string) => {
     setSearch(value);
     setPage(0);
   };
 
-  // Get total count
+  const invalidateContacts = () => {
+    queryClient.invalidateQueries({ queryKey: ["contacts"] });
+    queryClient.invalidateQueries({ queryKey: ["contacts-count"] });
+  };
+
   const { data: totalCount = 0 } = useQuery({
     queryKey: ["contacts-count", companyId, search, statusFilter],
     queryFn: async () => {
@@ -79,7 +89,7 @@ export default function ContactsPage() {
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
-  const addContact = useMutation({
+  const addContactMut = useMutation({
     mutationFn: async () => {
       if (!companyId) throw new Error("No company");
       const { error } = await supabase.from("contacts").insert({
@@ -92,11 +102,43 @@ export default function ContactsPage() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["contacts"] });
-      queryClient.invalidateQueries({ queryKey: ["contacts-count"] });
+      invalidateContacts();
       toast.success("Contato adicionado!");
       setOpen(false);
       setForm({ name: "", email: "", phone: "", origin: "Manual" });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const updateContactMut = useMutation({
+    mutationFn: async () => {
+      if (!editContact) throw new Error("No contact");
+      const { error } = await supabase.from("contacts").update({
+        name: editContact.name,
+        email: editContact.email,
+        phone: editContact.phone || null,
+        status: editContact.status as ContactStatus,
+      }).eq("id", editContact.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      invalidateContacts();
+      toast.success("Contato atualizado!");
+      setEditContact(null);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const deleteContactMut = useMutation({
+    mutationFn: async () => {
+      if (!deleteContact) throw new Error("No contact");
+      const { error } = await supabase.from("contacts").delete().eq("id", deleteContact.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      invalidateContacts();
+      toast.success("Contato excluído!");
+      setDeleteContact(null);
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -117,11 +159,11 @@ export default function ContactsPage() {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader><DialogTitle>Novo Contato</DialogTitle></DialogHeader>
-              <form onSubmit={(e) => { e.preventDefault(); addContact.mutate(); }} className="space-y-4">
+              <form onSubmit={(e) => { e.preventDefault(); addContactMut.mutate(); }} className="space-y-4">
                 <div><Label>Nome</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required className="mt-1" /></div>
                 <div><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required className="mt-1" /></div>
                 <div><Label>Telefone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="mt-1" /></div>
-                <Button type="submit" disabled={addContact.isPending} className="w-full">{addContact.isPending ? "Salvando..." : "Adicionar"}</Button>
+                <Button type="submit" disabled={addContactMut.isPending} className="w-full">{addContactMut.isPending ? "Salvando..." : "Adicionar"}</Button>
               </form>
             </DialogContent>
           </Dialog>
@@ -155,13 +197,14 @@ export default function ContactsPage() {
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Status</th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Origem</th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Cadastro</th>
+              <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">Ações</th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
-              <tr><td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">Carregando...</td></tr>
+              <tr><td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">Carregando...</td></tr>
             ) : contacts.length === 0 ? (
-              <tr><td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">Nenhum contato encontrado</td></tr>
+              <tr><td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">Nenhum contato encontrado</td></tr>
             ) : (
               contacts.map((c) => (
                 <tr key={c.id} className="border-t border-border hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => setActivityContact({ id: c.id, name: c.name, email: c.email })}>
@@ -172,6 +215,23 @@ export default function ContactsPage() {
                   <td className="px-6 py-4"><span className={statusClass[c.status] || "badge-neutral"}>{statusLabel[c.status] || c.status}</span></td>
                   <td className="px-6 py-4 text-sm text-muted-foreground">{c.origin || "-"}</td>
                   <td className="px-6 py-4 text-sm text-muted-foreground">{new Date(c.created_at).toLocaleDateString("pt-BR")}</td>
+                  <td className="px-6 py-4 text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditContact({ id: c.id, name: c.name || "", email: c.email, phone: c.phone || "", status: c.status }); }}>
+                          <Pencil className="h-4 w-4 mr-2" /> Editar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={(e) => { e.stopPropagation(); setDeleteContact({ id: c.id, name: c.name, email: c.email }); }}>
+                          <Trash2 className="h-4 w-4 mr-2" /> Excluir
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </td>
                 </tr>
               ))
             )}
@@ -210,6 +270,53 @@ export default function ContactsPage() {
           </Button>
         </div>
       </div>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editContact} onOpenChange={(o) => !o && setEditContact(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Editar Contato</DialogTitle></DialogHeader>
+          {editContact && (
+            <form onSubmit={(e) => { e.preventDefault(); updateContactMut.mutate(); }} className="space-y-4">
+              <div><Label>Nome</Label><Input value={editContact.name} onChange={(e) => setEditContact({ ...editContact, name: e.target.value })} required className="mt-1" /></div>
+              <div><Label>Email</Label><Input type="email" value={editContact.email} onChange={(e) => setEditContact({ ...editContact, email: e.target.value })} required className="mt-1" /></div>
+              <div><Label>Telefone</Label><Input value={editContact.phone} onChange={(e) => setEditContact({ ...editContact, phone: e.target.value })} className="mt-1" /></div>
+              <div>
+                <Label>Status</Label>
+                <Select value={editContact.status} onValueChange={(v) => setEditContact({ ...editContact, status: v })}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Ativo</SelectItem>
+                    <SelectItem value="inactive">Inativo</SelectItem>
+                    <SelectItem value="unsubscribed">Descadastrado</SelectItem>
+                    <SelectItem value="bounced">Bounced</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button type="submit" disabled={updateContactMut.isPending} className="w-full">{updateContactMut.isPending ? "Salvando..." : "Salvar"}</Button>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteContact} onOpenChange={(o) => !o && setDeleteContact(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir contato?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir <span className="font-medium text-foreground">{deleteContact?.name || deleteContact?.email}</span>? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => deleteContactMut.mutate()} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {deleteContactMut.isPending ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <ContactActivityDialog open={!!activityContact} onOpenChange={(o) => !o && setActivityContact(null)} contact={activityContact} />
     </AppLayout>
