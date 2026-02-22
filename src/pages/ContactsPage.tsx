@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { CsvImportDialog } from "@/components/contacts/CsvImportDialog";
 import { Label } from "@/components/ui/label";
 
 const statusClass: Record<string, string> = {
@@ -28,6 +29,7 @@ export default function ContactsPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", phone: "", origin: "Manual" });
 
   const { data: contacts = [], isLoading } = useQuery({
@@ -70,7 +72,8 @@ export default function ContactsPage() {
           <p className="page-description">Gerencie sua base de contatos e leads ({contacts.length})</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="gap-2"><Upload className="h-4 w-4" /> Importar</Button>
+          <Button variant="outline" size="sm" className="gap-2" onClick={() => setImportOpen(true)}><Upload className="h-4 w-4" /> Importar</Button>
+          <CsvImportDialog open={importOpen} onOpenChange={setImportOpen} />
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button size="sm" className="gap-2"><Plus className="h-4 w-4" /> Novo Contato</Button>
