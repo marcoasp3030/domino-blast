@@ -168,7 +168,7 @@ export function CampaignWizardDialog({ open, onOpenChange, editCampaign }: Props
         </div>
 
         {/* Step content */}
-        <div className="min-h-[240px]">
+        <div className="min-h-[240px] max-h-[60vh] overflow-y-auto pr-1">
           {step === 0 && (
             <div className="space-y-4">
               <div><Label>Nome da campanha *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex: Newsletter Janeiro" className="mt-1" required /></div>
