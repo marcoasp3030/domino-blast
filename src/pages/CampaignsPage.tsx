@@ -1,6 +1,6 @@
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2, Send, Loader2, Pencil, RotateCcw, BarChart3 } from "lucide-react";
+import { Plus, Trash2, Send, Loader2, Pencil, RotateCcw, BarChart3, FlaskConical, Trophy } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -76,12 +76,37 @@ export default function CampaignsPage() {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      toast.success(`Campanha enviada! ${data.sent} emails enviados, ${data.failed} falharam.`);
+      if (data?.ab_test) {
+        toast.success(data.message);
+      } else {
+        toast.success(`Campanha enviada! ${data.total_contacts} contatos em ${data.batches_queued} lotes`);
+      }
       queryClient.invalidateQueries({ queryKey: ["campaigns"] });
     } catch (e: any) {
       toast.error(e.message || "Erro ao enviar campanha");
     } finally {
       setSendingId(null);
+    }
+  };
+
+  const [evaluatingId, setEvaluatingId] = useState<string | null>(null);
+
+  const evaluateABTest = async (campaignId: string) => {
+    setEvaluatingId(campaignId);
+    try {
+      const { data, error } = await supabase.functions.invoke("evaluate-ab-test", {
+        body: { campaign_id: campaignId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      const result = data?.results?.[0];
+      if (result?.error) throw new Error(result.error);
+      toast.success(result?.message || "Avaliação concluída!");
+      queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao avaliar teste A/B");
+    } finally {
+      setEvaluatingId(null);
     }
   };
 
@@ -112,6 +137,19 @@ export default function CampaignsPage() {
                     <span className={statusClass[c.status] || "badge-neutral"}>{statusLabel[c.status] || c.status}</span>
                   </div>
                   <p className="text-sm text-muted-foreground truncate">Assunto: {c.subject || "-"}</p>
+                  {c.ab_test_enabled && (
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <FlaskConical className="h-3.5 w-3.5 text-primary" />
+                      <span className="text-xs font-medium text-primary">
+                        {c.ab_test_status === "testing" && "Teste A/B em andamento..."}
+                        {c.ab_test_status === "winner_selected" && `Vencedor: Variação ${c.ab_test_winner} — enviando para restantes...`}
+                        {c.ab_test_status === "winner_sent" && (
+                          <span className="flex items-center gap-1"><Trophy className="h-3 w-3" /> Variação {c.ab_test_winner} venceu!</span>
+                        )}
+                        {c.ab_test_status === "none" && `A/B: "${c.subject}" vs "${c.subject_b}"`}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex flex-wrap gap-2 mt-1.5 text-xs text-muted-foreground">
                     {c.lists?.name && <span>Lista: {c.lists.name}</span>}
                     {c.email_templates?.name && <span>• Template: {c.email_templates.name}</span>}
@@ -165,10 +203,16 @@ export default function CampaignsPage() {
                       </Button>
                     </div>
                   )}
-                  {c.status === "sending" && (
+                  {c.status === "sending" && !c.ab_test_enabled && (
                     <div className="min-w-[200px]">
                       <CampaignProgress campaignId={c.id} totalRecipients={c.total_recipients || 0} />
                     </div>
+                  )}
+                  {c.status === "sending" && c.ab_test_enabled && c.ab_test_status === "testing" && (
+                    <Button size="sm" variant="secondary" className="gap-1.5 h-8" onClick={() => evaluateABTest(c.id)} disabled={evaluatingId === c.id}>
+                      {evaluatingId === c.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trophy className="h-3.5 w-3.5" />}
+                      {evaluatingId === c.id ? "Avaliando..." : "Avaliar Vencedor"}
+                    </Button>
                   )}
                 </div>
               </div>
