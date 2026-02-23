@@ -626,6 +626,7 @@ export type Database = {
       }
       sends: {
         Row: {
+          ab_variant: string | null
           campaign_id: string
           contact_id: string
           created_at: string
@@ -637,6 +638,7 @@ export type Database = {
           status: Database["public"]["Enums"]["send_status"]
         }
         Insert: {
+          ab_variant?: string | null
           campaign_id: string
           contact_id: string
           created_at?: string
@@ -648,6 +650,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["send_status"]
         }
         Update: {
+          ab_variant?: string | null
           campaign_id?: string
           contact_id?: string
           created_at?: string
