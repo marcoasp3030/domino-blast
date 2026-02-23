@@ -10,7 +10,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { CheckCircle2, ChevronLeft, ChevronRight, FileText, Users, Send, Calendar, FlaskConical } from "lucide-react";
+import { CheckCircle2, ChevronLeft, ChevronRight, FileText, Users, Send, Calendar, FlaskConical, Store } from "lucide-react";
 
 const STEPS = [
   { label: "Informações", icon: FileText },
@@ -35,7 +35,7 @@ export function CampaignWizardDialog({ open, onOpenChange, editCampaign }: Props
 
   const defaultForm = {
     name: "", subject: "", preheader: "",
-    template_id: "", list_id: "", sender_id: "",
+    template_id: "", list_id: "", sender_id: "", store_id: "",
     scheduled_at: "", send_now: true,
     utm_source: "", utm_medium: "email", utm_campaign: "",
     ab_test_enabled: false, subject_b: "",
@@ -54,6 +54,7 @@ export function CampaignWizardDialog({ open, onOpenChange, editCampaign }: Props
         template_id: editCampaign.template_id || "",
         list_id: editCampaign.list_id || "",
         sender_id: editCampaign.sender_id || "",
+        store_id: editCampaign.store_id || "",
         scheduled_at: editCampaign.scheduled_at ? new Date(editCampaign.scheduled_at).toISOString().slice(0, 16) : "",
         send_now: !editCampaign.scheduled_at,
         utm_source: editCampaign.utm_source || "",
@@ -89,6 +90,12 @@ export function CampaignWizardDialog({ open, onOpenChange, editCampaign }: Props
     enabled: !!companyId && open,
   });
 
+  const { data: stores = [] } = useQuery({
+    queryKey: ["stores", companyId],
+    queryFn: async () => { const { data } = await supabase.from("stores").select("id, name").order("name"); return data || []; },
+    enabled: !!companyId && open,
+  });
+
   const canNext = () => {
     if (step === 0) return form.name && form.subject && (!form.ab_test_enabled || form.subject_b);
     if (step === 1) return form.list_id;
@@ -112,6 +119,7 @@ export function CampaignWizardDialog({ open, onOpenChange, editCampaign }: Props
         template_id: form.template_id || null,
         list_id: form.list_id || null,
         sender_id: form.sender_id || null,
+        store_id: form.store_id || null,
         status,
         scheduled_at: status === "scheduled" && form.scheduled_at ? new Date(form.scheduled_at).toISOString() : null,
         total_recipients: totalRecipients,
@@ -246,6 +254,16 @@ export function CampaignWizardDialog({ open, onOpenChange, editCampaign }: Props
                     {lists.map((l: any) => (
                       <SelectItem key={l.id} value={l.id}>{l.name} ({l.list_members?.length || 0} contatos)</SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Loja (opcional)</Label>
+                <Select value={form.store_id || "none"} onValueChange={(v) => setForm({ ...form, store_id: v === "none" ? "" : v })}>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione uma loja" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhuma (todas)</SelectItem>
+                    {stores.map((s) => <SelectItem key={s.id} value={s.id}><span className="flex items-center gap-2"><Store className="h-3 w-3" />{s.name}</span></SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
