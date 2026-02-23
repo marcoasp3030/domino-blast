@@ -2,7 +2,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Upload, Plus, Search, ChevronLeft, ChevronRight, MoreHorizontal, Pencil, Trash2, Download, Tags } from "lucide-react";
+import { Upload, Plus, Search, ChevronLeft, ChevronRight, MoreHorizontal, Pencil, Trash2, Download, Tags, Zap, RefreshCw } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -18,6 +18,8 @@ import { useContactTags, useTags, ContactTagBadges, ContactTagPicker, TagManager
 import { BulkTagPicker } from "@/components/contacts/BulkTagPicker";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Progress } from "@/components/ui/progress";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const PAGE_SIZES = [25, 50, 100];
 
@@ -35,6 +37,30 @@ const statusLabel: Record<string, string> = {
 };
 
 type ContactStatus = "active" | "inactive" | "unsubscribed" | "bounced";
+
+function ScoreBadge({ score }: { score: number }) {
+  let color: string;
+  let label: string;
+  if (score >= 70) { color = "text-emerald-600"; label = "Quente"; }
+  else if (score >= 40) { color = "text-amber-500"; label = "Morno"; }
+  else if (score > 0) { color = "text-orange-500"; label = "Frio"; }
+  else { color = "text-muted-foreground"; label = "Inativo"; }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="flex items-center gap-1.5 min-w-[70px]">
+          <Zap className={`h-3.5 w-3.5 shrink-0 ${color}`} />
+          <Progress value={score} className="h-1.5 flex-1 max-w-[40px]" />
+          <span className={`text-xs font-semibold ${color}`}>{score}</span>
+        </div>
+      </TooltipTrigger>
+      <TooltipContent side="top">
+        <p className="text-xs">Score: {score}/100 — {label}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 export default function ContactsPage() {
   const { companyId } = useAuth();
@@ -57,6 +83,8 @@ export default function ContactsPage() {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [tagManagerOpen, setTagManagerOpen] = useState(false);
   const [tagFilter, setTagFilter] = useState<string>("all");
+  const [scoreFilter, setScoreFilter] = useState<string>("all");
+  const [recalculating, setRecalculating] = useState(false);
 
   const handleSearch = (value: string) => {
     setSearch(value);
@@ -94,13 +122,22 @@ export default function ContactsPage() {
     return q;
   };
 
+  const applyScoreFilter = (q: any) => {
+    if (scoreFilter === "hot") q = q.gte("engagement_score", 70);
+    else if (scoreFilter === "warm") q = q.gte("engagement_score", 40).lt("engagement_score", 70);
+    else if (scoreFilter === "cold") q = q.gt("engagement_score", 0).lt("engagement_score", 40);
+    else if (scoreFilter === "inactive") q = q.eq("engagement_score", 0);
+    return q;
+  };
+
   const { data: totalCount = 0 } = useQuery({
-    queryKey: ["contacts-count", companyId, search, statusFilter, tagFilter, tagFilteredIds],
+    queryKey: ["contacts-count", companyId, search, statusFilter, tagFilter, tagFilteredIds, scoreFilter],
     queryFn: async () => {
       let q = supabase.from("contacts").select("*", { count: "exact", head: true });
       if (search) q = q.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
       if (statusFilter !== "all") q = q.eq("status", statusFilter as ContactStatus);
       q = applyTagFilter(q);
+      q = applyScoreFilter(q);
       const { count } = await q;
       return count || 0;
     },
@@ -108,7 +145,7 @@ export default function ContactsPage() {
   });
 
   const { data: contacts = [], isLoading } = useQuery({
-    queryKey: ["contacts", companyId, search, page, pageSize, statusFilter, tagFilter, tagFilteredIds],
+    queryKey: ["contacts", companyId, search, page, pageSize, statusFilter, tagFilter, tagFilteredIds, scoreFilter],
     queryFn: async () => {
       let q = supabase
         .from("contacts")
@@ -118,6 +155,7 @@ export default function ContactsPage() {
       if (search) q = q.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
       if (statusFilter !== "all") q = q.eq("status", statusFilter as ContactStatus);
       q = applyTagFilter(q);
+      q = applyScoreFilter(q);
       const { data } = await q;
       return data || [];
     },
@@ -242,6 +280,21 @@ export default function ContactsPage() {
     toast.success(`${data.length} contatos exportados!`);
   };
 
+  const recalculateScores = async () => {
+    if (!companyId) return;
+    setRecalculating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("recalculate-scores");
+      if (error) throw error;
+      invalidateContacts();
+      toast.success(`Scores recalculados para ${data?.total_updated || 0} contatos!`);
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao recalcular scores");
+    } finally {
+      setRecalculating(false);
+    }
+  };
+
   return (
     <AppLayout>
       <div className="page-header flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -304,6 +357,26 @@ export default function ContactsPage() {
             ))}
           </SelectContent>
         </Select>
+        <Select value={scoreFilter} onValueChange={(v) => { setScoreFilter(v); setPage(0); }}>
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="Score" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os scores</SelectItem>
+            <SelectItem value="hot">🔥 Quente (70+)</SelectItem>
+            <SelectItem value="warm">🌤 Morno (40-69)</SelectItem>
+            <SelectItem value="cold">❄️ Frio (1-39)</SelectItem>
+            <SelectItem value="inactive">⬜ Inativo (0)</SelectItem>
+          </SelectContent>
+        </Select>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={recalculateScores} disabled={recalculating}>
+              <RefreshCw className={`h-4 w-4 ${recalculating ? "animate-spin" : ""}`} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Recalcular scores</TooltipContent>
+        </Tooltip>
       </div>
 
       {/* Bulk action bar */}
@@ -324,9 +397,11 @@ export default function ContactsPage() {
             <tr>
               <th className="px-3 py-3 w-10"><Checkbox checked={allSelected} onCheckedChange={toggleSelectAll} aria-label="Selecionar todos" /></th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Contato</th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Score</th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Status</th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Origem</th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Cadastro</th>
+              <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">Ações</th>
               <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">Ações</th>
             </tr>
           </thead>
@@ -334,7 +409,7 @@ export default function ContactsPage() {
             {isLoading || (tagFilter !== "all" && isTagFilterLoading) ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i} className="border-t border-border">
-                  <td className="px-3 py-4"><Skeleton className="h-4 w-4 rounded" /></td>
+                   <td className="px-3 py-4"><Skeleton className="h-4 w-4 rounded" /></td>
                   <td className="px-6 py-4">
                     <div className="space-y-2">
                       <Skeleton className="h-4 w-32" />
@@ -342,14 +417,16 @@ export default function ContactsPage() {
                       <div className="flex gap-1"><Skeleton className="h-5 w-14 rounded-full" /><Skeleton className="h-5 w-16 rounded-full" /></div>
                     </div>
                   </td>
+                  <td className="px-4 py-4"><Skeleton className="h-3 w-16" /></td>
                   <td className="px-6 py-4"><Skeleton className="h-5 w-16 rounded-full" /></td>
                   <td className="px-6 py-4"><Skeleton className="h-4 w-20" /></td>
                   <td className="px-6 py-4"><Skeleton className="h-4 w-24" /></td>
                   <td className="px-6 py-4 text-right"><Skeleton className="h-8 w-8 rounded ml-auto" /></td>
+                  <td className="px-6 py-4 text-right"><Skeleton className="h-8 w-8 rounded ml-auto" /></td>
                 </tr>
               ))
             ) : contacts.length === 0 ? (
-              <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">Nenhum contato encontrado</td></tr>
+              <tr><td colSpan={7} className="px-6 py-8 text-center text-muted-foreground">Nenhum contato encontrado</td></tr>
             ) : (
               contacts.map((c) => (
                 <tr key={c.id} className={`border-t border-border hover:bg-muted/50 transition-colors cursor-pointer ${selectedIds.has(c.id) ? "bg-muted/40" : ""}`} onClick={() => setActivityContact({ id: c.id, name: c.name, email: c.email })}>
@@ -366,6 +443,7 @@ export default function ContactsPage() {
                       <ContactTagPicker contactId={c.id} currentTags={contactTagsMap[c.id] || []} />
                     </div>
                   </td>
+                  <td className="px-4 py-4"><ScoreBadge score={(c as any).engagement_score || 0} /></td>
                   <td className="px-6 py-4"><span className={statusClass[c.status] || "badge-neutral"}>{statusLabel[c.status] || c.status}</span></td>
                   <td className="px-6 py-4 text-sm text-muted-foreground">{c.origin || "-"}</td>
                   <td className="px-6 py-4 text-sm text-muted-foreground">{new Date(c.created_at).toLocaleDateString("pt-BR")}</td>
