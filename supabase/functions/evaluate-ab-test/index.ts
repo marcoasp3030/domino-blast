@@ -96,7 +96,7 @@ async function evaluateCampaign(
   // Get all sends for this campaign
   const { data: sends } = await supabase
     .from("sends")
-    .select("id, contact_id")
+    .select("id, contact_id, ab_variant")
     .eq("campaign_id", campaignId);
 
   if (!sends || sends.length === 0) throw new Error("No sends found");
@@ -110,15 +110,16 @@ async function evaluateCampaign(
     .eq("campaign_id", campaignId)
     .in("event_type", ["open", "click"]);
 
-  // Get list members to determine who was in which group
-  // Since we don't store variant per send, we use total_recipients and sample info
-  // Better approach: count opens per subject line from sends
-  // Actually we need to determine variant. Let's use a simpler heuristic:
-  // The first half of sends (by created_at) = A, second half = B
-  const halfIndex = Math.floor(sends.length / 2);
-  const groupASendIds = new Set(sends.slice(0, halfIndex).map((s: any) => s.id));
-  const groupAContactIds = new Set(sends.slice(0, halfIndex).map((s: any) => s.contact_id));
-  const groupBContactIds = new Set(sends.slice(halfIndex).map((s: any) => s.contact_id));
+  // Use stored ab_variant to determine groups
+  const groupAContactIds = new Set(sends.filter((s: any) => s.ab_variant === "A").map((s: any) => s.contact_id));
+  const groupBContactIds = new Set(sends.filter((s: any) => s.ab_variant === "B").map((s: any) => s.contact_id));
+
+  // Fallback for legacy sends without ab_variant: split by order
+  if (groupAContactIds.size === 0 && groupBContactIds.size === 0) {
+    const halfIndex = Math.floor(sends.length / 2);
+    sends.slice(0, halfIndex).forEach((s: any) => groupAContactIds.add(s.contact_id));
+    sends.slice(halfIndex).forEach((s: any) => groupBContactIds.add(s.contact_id));
+  }
 
   let aOpens = 0, aClicks = 0, bOpens = 0, bClicks = 0;
   if (events) {
@@ -241,6 +242,7 @@ async function evaluateCampaign(
         batch_index: batchIndex,
         total_batches: totalBatches,
         is_last_batch: batchIndex === totalBatches - 1,
+        ab_variant: "winner",
       }),
     }).catch((err) => console.error(`Failed winner batch ${batchIndex}:`, err));
 

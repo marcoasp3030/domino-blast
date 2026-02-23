@@ -26,6 +26,7 @@ interface BatchPayload {
   batch_index: number;
   total_batches: number;
   is_last_batch: boolean;
+  ab_variant?: string;
 }
 
 Deno.serve(async (req) => {
@@ -41,7 +42,7 @@ Deno.serve(async (req) => {
 
   try {
     const payload: BatchPayload = await req.json();
-    const { campaign_id, company_id, subject, html_content, sender, contacts, batch_index, total_batches, is_last_batch } = payload;
+    const { campaign_id, company_id, subject, html_content, sender, contacts, batch_index, total_batches, is_last_batch, ab_variant } = payload;
 
     console.log(`[Batch ${batch_index + 1}/${total_batches}] Processing ${contacts.length} contacts for campaign ${campaign_id}`);
 
@@ -56,6 +57,7 @@ Deno.serve(async (req) => {
       campaign_id,
       contact_id: c.id,
       status: "queued" as const,
+      ...(ab_variant ? { ab_variant } : {}),
     }));
 
     // Insert in chunks of 500 to avoid payload limits

@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { CampaignWizardDialog } from "@/components/campaigns/CampaignWizardDialog";
 import { CampaignRecipientsDialog } from "@/components/campaigns/CampaignRecipientsDialog";
 import { CampaignProgress } from "@/components/campaigns/CampaignProgress";
+import { ABTestResultsPanel } from "@/components/campaigns/ABTestResultsPanel";
 
 const statusClass: Record<string, string> = {
   completed: "badge-success", sending: "badge-info", scheduled: "badge-warning",
@@ -25,6 +26,7 @@ export default function CampaignsPage() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<any>(null);
   const [recipientsCampaign, setRecipientsCampaign] = useState<{ id: string; name: string } | null>(null);
+  const [abResultsCampaign, setAbResultsCampaign] = useState<any>(null);
 
   // Realtime: auto-refresh when campaign status changes
   useEffect(() => {
@@ -137,19 +139,24 @@ export default function CampaignsPage() {
                     <span className={statusClass[c.status] || "badge-neutral"}>{statusLabel[c.status] || c.status}</span>
                   </div>
                   <p className="text-sm text-muted-foreground truncate">Assunto: {c.subject || "-"}</p>
-                  {c.ab_test_enabled && (
-                    <div className="flex items-center gap-1.5 mt-1">
-                      <FlaskConical className="h-3.5 w-3.5 text-primary" />
-                      <span className="text-xs font-medium text-primary">
-                        {c.ab_test_status === "testing" && "Teste A/B em andamento..."}
-                        {c.ab_test_status === "winner_selected" && `Vencedor: Variação ${c.ab_test_winner} — enviando para restantes...`}
-                        {c.ab_test_status === "winner_sent" && (
-                          <span className="flex items-center gap-1"><Trophy className="h-3 w-3" /> Variação {c.ab_test_winner} venceu!</span>
-                        )}
-                        {c.ab_test_status === "none" && `A/B: "${c.subject}" vs "${c.subject_b}"`}
-                      </span>
-                    </div>
-                  )}
+                   {c.ab_test_enabled && (
+                     <div className="flex items-center gap-1.5 mt-1">
+                       <FlaskConical className="h-3.5 w-3.5 text-primary" />
+                       <span className="text-xs font-medium text-primary">
+                         {c.ab_test_status === "testing" && "Teste A/B em andamento..."}
+                         {c.ab_test_status === "winner_selected" && `Vencedor: Variação ${c.ab_test_winner} — enviando para restantes...`}
+                         {c.ab_test_status === "winner_sent" && (
+                           <span className="flex items-center gap-1"><Trophy className="h-3 w-3" /> Variação {c.ab_test_winner} venceu!</span>
+                         )}
+                         {c.ab_test_status === "none" && `A/B: "${c.subject}" vs "${c.subject_b}"`}
+                       </span>
+                       {(c.ab_test_status === "testing" || c.ab_test_status === "winner_selected" || c.ab_test_status === "winner_sent") && (
+                         <Button variant="ghost" size="sm" className="h-5 px-1.5 text-[10px] text-primary hover:text-primary" onClick={() => setAbResultsCampaign(c)}>
+                           Ver resultados
+                         </Button>
+                       )}
+                     </div>
+                   )}
                   <div className="flex flex-wrap gap-2 mt-1.5 text-xs text-muted-foreground">
                     {c.lists?.name && <span>Lista: {c.lists.name}</span>}
                     {c.email_templates?.name && <span>• Template: {c.email_templates.name}</span>}
@@ -223,6 +230,18 @@ export default function CampaignsPage() {
 
       <CampaignWizardDialog open={wizardOpen} onOpenChange={setWizardOpen} editCampaign={editingCampaign} />
       <CampaignRecipientsDialog open={!!recipientsCampaign} onOpenChange={(o) => !o && setRecipientsCampaign(null)} campaign={recipientsCampaign} />
+      <ABTestResultsPanel
+        open={!!abResultsCampaign}
+        onOpenChange={(o) => !o && setAbResultsCampaign(null)}
+        campaign={abResultsCampaign ? {
+          id: abResultsCampaign.id,
+          name: abResultsCampaign.name,
+          subject: abResultsCampaign.subject,
+          subject_b: abResultsCampaign.subject_b,
+          ab_test_winner: abResultsCampaign.ab_test_winner,
+          ab_test_status: abResultsCampaign.ab_test_status,
+        } : null}
+      />
     </AppLayout>
   );
 }
