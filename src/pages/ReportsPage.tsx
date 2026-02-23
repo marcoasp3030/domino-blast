@@ -2,33 +2,73 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EventContactsPanel } from "@/components/reports/EventContactsPanel";
 import { EventTimelineChart } from "@/components/reports/EventTimelineChart";
 import { CampaignComparisonChart } from "@/components/reports/CampaignComparisonChart";
-import { Eye, MousePointerClick, AlertTriangle, Mail } from "lucide-react";
+import { Eye, MousePointerClick, AlertTriangle, Mail, Store } from "lucide-react";
 
 export default function ReportsPage() {
   const { companyId } = useAuth();
+  const [storeFilter, setStoreFilter] = useState<string>("all");
+
+  const { data: allStores = [] } = useQuery({
+    queryKey: ["stores", companyId],
+    queryFn: async () => {
+      const { data } = await supabase.from("stores").select("id, name").order("name");
+      return data || [];
+    },
+    enabled: !!companyId,
+  });
+
+  // Get campaign IDs for the selected store to filter events
+  const { data: storeCampaignIds } = useQuery({
+    queryKey: ["store-campaign-ids", companyId, storeFilter],
+    queryFn: async () => {
+      if (storeFilter === "all") return null;
+      let q = supabase.from("campaigns").select("id");
+      if (storeFilter === "none") q = q.is("store_id", null);
+      else q = q.eq("store_id", storeFilter);
+      const { data } = await q;
+      return (data || []).map((c) => c.id);
+    },
+    enabled: !!companyId,
+  });
 
   const { data: campaigns = [] } = useQuery({
-    queryKey: ["report-campaigns", companyId],
+    queryKey: ["report-campaigns", companyId, storeFilter],
     queryFn: async () => {
-      const { data } = await supabase.from("campaigns").select("*").eq("status", "completed").order("completed_at", { ascending: false }).limit(10);
+      let q = supabase.from("campaigns").select("*, stores(name)").eq("status", "completed").order("completed_at", { ascending: false }).limit(10);
+      if (storeFilter === "none") q = q.is("store_id", null);
+      else if (storeFilter !== "all") q = q.eq("store_id", storeFilter);
+      const { data } = await q;
       return data || [];
     },
     enabled: !!companyId,
   });
 
   const { data: eventCounts } = useQuery({
-    queryKey: ["report-events", companyId],
+    queryKey: ["report-events", companyId, storeFilter, storeCampaignIds],
     queryFn: async () => {
-      const { data } = await supabase.rpc("get_event_counts", { _company_id: companyId! });
+      if (storeFilter === "all") {
+        const { data } = await supabase.rpc("get_event_counts", { _company_id: companyId! });
+        const counts: Record<string, number> = {};
+        (data || []).forEach((r: any) => { counts[r.event_type] = Number(r.count); });
+        return counts;
+      }
+      // Filter events by campaign IDs belonging to the store
+      if (!storeCampaignIds || storeCampaignIds.length === 0) return {};
+      const { data } = await supabase
+        .from("events")
+        .select("event_type")
+        .in("campaign_id", storeCampaignIds);
       const counts: Record<string, number> = {};
-      (data || []).forEach((r: any) => { counts[r.event_type] = Number(r.count); });
+      (data || []).forEach((r: any) => { counts[r.event_type] = (counts[r.event_type] || 0) + 1; });
       return counts;
     },
-    enabled: !!companyId,
+    enabled: !!companyId && (storeFilter === "all" || storeCampaignIds !== undefined),
   });
 
   const delivered = eventCounts?.delivered || 0;
@@ -60,9 +100,25 @@ export default function ReportsPage() {
 
   return (
     <AppLayout>
-      <div className="page-header">
-        <h1 className="page-title">Relatórios</h1>
-        <p className="page-description">Análise detalhada de performance</p>
+      <div className="page-header flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="page-title">Relatórios</h1>
+          <p className="page-description">Análise detalhada de performance</p>
+        </div>
+        <Select value={storeFilter} onValueChange={setStoreFilter}>
+          <SelectTrigger className="w-[180px] h-9">
+            <SelectValue placeholder="Loja" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as lojas</SelectItem>
+            <SelectItem value="none">Sem loja</SelectItem>
+            {allStores.map((s) => (
+              <SelectItem key={s.id} value={s.id}>
+                <span className="flex items-center gap-2"><Store className="h-3 w-3" />{s.name}</span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
@@ -117,7 +173,10 @@ export default function ReportsPage() {
                 <div key={c.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                   <div>
                     <p className="font-medium text-sm">{c.name}</p>
-                    <p className="text-xs text-muted-foreground">{c.completed_at ? new Date(c.completed_at).toLocaleDateString("pt-BR") : "-"}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>{c.completed_at ? new Date(c.completed_at).toLocaleDateString("pt-BR") : "-"}</span>
+                      {(c as any).stores?.name && <span className="flex items-center gap-1"><Store className="h-3 w-3" />{(c as any).stores.name}</span>}
+                    </div>
                   </div>
                   <span className="text-sm font-semibold">{c.total_recipients || 0} envios</span>
                 </div>

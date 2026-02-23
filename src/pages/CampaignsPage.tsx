@@ -1,6 +1,7 @@
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2, Send, Loader2, Pencil, RotateCcw, BarChart3, FlaskConical, Trophy } from "lucide-react";
+import { Plus, Trash2, Send, Loader2, Pencil, RotateCcw, BarChart3, FlaskConical, Trophy, Store } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -27,6 +28,16 @@ export default function CampaignsPage() {
   const [editingCampaign, setEditingCampaign] = useState<any>(null);
   const [recipientsCampaign, setRecipientsCampaign] = useState<{ id: string; name: string } | null>(null);
   const [abResultsCampaign, setAbResultsCampaign] = useState<any>(null);
+  const [storeFilter, setStoreFilter] = useState<string>("all");
+
+  const { data: allStores = [] } = useQuery({
+    queryKey: ["stores", companyId],
+    queryFn: async () => {
+      const { data } = await supabase.from("stores").select("id, name").order("name");
+      return data || [];
+    },
+    enabled: !!companyId,
+  });
 
   // Realtime: auto-refresh when campaign status changes
   useEffect(() => {
@@ -44,9 +55,12 @@ export default function CampaignsPage() {
   }, [queryClient]);
 
   const { data: campaigns = [], isLoading } = useQuery({
-    queryKey: ["campaigns", companyId],
+    queryKey: ["campaigns", companyId, storeFilter],
     queryFn: async () => {
-      const { data } = await supabase.from("campaigns").select("*, lists(name), senders(from_name, from_email), email_templates(name)").order("created_at", { ascending: false });
+      let q = supabase.from("campaigns").select("*, lists(name), senders(from_name, from_email), email_templates(name), stores(name)").order("created_at", { ascending: false });
+      if (storeFilter === "none") q = q.is("store_id", null);
+      else if (storeFilter !== "all") q = q.eq("store_id", storeFilter);
+      const { data } = await q;
       return data || [];
     },
     enabled: !!companyId,
@@ -119,7 +133,23 @@ export default function CampaignsPage() {
           <h1 className="page-title">Campanhas</h1>
           <p className="page-description">Crie e gerencie suas campanhas de email</p>
         </div>
-        <Button size="sm" className="gap-2" onClick={() => { setEditingCampaign(null); setWizardOpen(true); }}><Plus className="h-4 w-4" /> Nova Campanha</Button>
+        <div className="flex gap-2 items-center">
+          <Select value={storeFilter} onValueChange={setStoreFilter}>
+            <SelectTrigger className="w-[160px] h-9">
+              <SelectValue placeholder="Loja" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as lojas</SelectItem>
+              <SelectItem value="none">Sem loja</SelectItem>
+              {allStores.map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  <span className="flex items-center gap-2"><Store className="h-3 w-3" />{s.name}</span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button size="sm" className="gap-2" onClick={() => { setEditingCampaign(null); setWizardOpen(true); }}><Plus className="h-4 w-4" /> Nova Campanha</Button>
+        </div>
       </div>
 
       <div className="grid gap-4">
@@ -158,7 +188,8 @@ export default function CampaignsPage() {
                      </div>
                    )}
                   <div className="flex flex-wrap gap-2 mt-1.5 text-xs text-muted-foreground">
-                    {c.lists?.name && <span>Lista: {c.lists.name}</span>}
+                    {c.stores?.name && <span className="flex items-center gap-1"><Store className="h-3 w-3" />{c.stores.name}</span>}
+                    {c.lists?.name && <span>{c.stores?.name ? "•" : ""} Lista: {c.lists.name}</span>}
                     {c.email_templates?.name && <span>• Template: {c.email_templates.name}</span>}
                     {c.senders?.from_email && <span>• De: {c.senders.from_email}</span>}
                     {c.scheduled_at && <span>• Agendada: {new Date(c.scheduled_at).toLocaleString("pt-BR")}</span>}

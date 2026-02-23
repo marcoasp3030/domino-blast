@@ -78,6 +78,7 @@ export type Database = {
           sender_id: string | null
           sent_at: string | null
           status: Database["public"]["Enums"]["campaign_status"]
+          store_id: string | null
           subject: string | null
           subject_b: string | null
           template_id: string | null
@@ -109,6 +110,7 @@ export type Database = {
           sender_id?: string | null
           sent_at?: string | null
           status?: Database["public"]["Enums"]["campaign_status"]
+          store_id?: string | null
           subject?: string | null
           subject_b?: string | null
           template_id?: string | null
@@ -140,6 +142,7 @@ export type Database = {
           sender_id?: string | null
           sent_at?: string | null
           status?: Database["public"]["Enums"]["campaign_status"]
+          store_id?: string | null
           subject?: string | null
           subject_b?: string | null
           template_id?: string | null
@@ -169,6 +172,13 @@ export type Database = {
             columns: ["sender_id"]
             isOneToOne: false
             referencedRelation: "senders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaigns_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
             referencedColumns: ["id"]
           },
           {
