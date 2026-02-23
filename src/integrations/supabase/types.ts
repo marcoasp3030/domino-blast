@@ -255,6 +255,7 @@ export type Database = {
           phone: string | null
           score_updated_at: string | null
           status: Database["public"]["Enums"]["contact_status"]
+          store_id: string | null
           updated_at: string
         }
         Insert: {
@@ -271,6 +272,7 @@ export type Database = {
           phone?: string | null
           score_updated_at?: string | null
           status?: Database["public"]["Enums"]["contact_status"]
+          store_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -287,6 +289,7 @@ export type Database = {
           phone?: string | null
           score_updated_at?: string | null
           status?: Database["public"]["Enums"]["contact_status"]
+          store_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -295,6 +298,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacts_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
             referencedColumns: ["id"]
           },
         ]
@@ -674,6 +684,38 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stores: {
+        Row: {
+          company_id: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stores_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]

@@ -1,7 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Users, ListFilter, Palette, Send, Globe,
-  BarChart3, Settings, ChevronLeft, ChevronRight, LogOut, Activity, Zap, UsersRound,
+  BarChart3, Settings, ChevronLeft, ChevronRight, LogOut, Activity, Zap, UsersRound, Store,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,7 @@ import nutricarLogo from "@/assets/nutricar-logo.webp";
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/", permission: null },
   { icon: Users, label: "Contatos", path: "/contacts", permission: "contacts" },
+  { icon: Store, label: "Lojas", path: "/stores", permission: "contacts" },
   { icon: ListFilter, label: "Listas & Segmentos", path: "/lists", permission: "lists" },
   { icon: Palette, label: "Templates", path: "/templates", permission: "templates" },
   { icon: Send, label: "Campanhas", path: "/campaigns", permission: "campaigns" },

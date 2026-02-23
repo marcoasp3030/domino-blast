@@ -2,7 +2,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Upload, Plus, Search, ChevronLeft, ChevronRight, MoreHorizontal, Pencil, Trash2, Download, Tags, Zap, RefreshCw } from "lucide-react";
+import { Upload, Plus, Search, ChevronLeft, ChevronRight, MoreHorizontal, Pencil, Trash2, Download, Tags, Zap, RefreshCw, Store } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -68,14 +68,14 @@ export default function ContactsPage() {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", phone: "", origin: "Manual" });
+  const [form, setForm] = useState({ name: "", email: "", phone: "", origin: "Manual", store_id: "" });
   const [activityContact, setActivityContact] = useState<{ id: string; name: string | null; email: string } | null>(null);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
   // Edit state
-  const [editContact, setEditContact] = useState<{ id: string; name: string; email: string; phone: string; status: string } | null>(null);
+  const [editContact, setEditContact] = useState<{ id: string; name: string; email: string; phone: string; status: string; store_id: string } | null>(null);
   // Delete state
   const [deleteContact, setDeleteContact] = useState<{ id: string; name: string | null; email: string } | null>(null);
   // Bulk selection
@@ -84,6 +84,7 @@ export default function ContactsPage() {
   const [tagManagerOpen, setTagManagerOpen] = useState(false);
   const [tagFilter, setTagFilter] = useState<string>("all");
   const [scoreFilter, setScoreFilter] = useState<string>("all");
+  const [storeFilter, setStoreFilter] = useState<string>("all");
   const [recalculating, setRecalculating] = useState(false);
 
   const handleSearch = (value: string) => {
@@ -130,14 +131,31 @@ export default function ContactsPage() {
     return q;
   };
 
+  const applyStoreFilter = (q: any) => {
+    if (storeFilter === "none") q = q.is("store_id", null);
+    else if (storeFilter !== "all") q = q.eq("store_id", storeFilter);
+    return q;
+  };
+
+  // Fetch stores for filter
+  const { data: allStores = [] } = useQuery({
+    queryKey: ["stores", companyId],
+    queryFn: async () => {
+      const { data } = await supabase.from("stores").select("id, name").order("name");
+      return data || [];
+    },
+    enabled: !!companyId,
+  });
+
   const { data: totalCount = 0 } = useQuery({
-    queryKey: ["contacts-count", companyId, search, statusFilter, tagFilter, tagFilteredIds, scoreFilter],
+    queryKey: ["contacts-count", companyId, search, statusFilter, tagFilter, tagFilteredIds, scoreFilter, storeFilter],
     queryFn: async () => {
       let q = supabase.from("contacts").select("*", { count: "exact", head: true });
       if (search) q = q.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
       if (statusFilter !== "all") q = q.eq("status", statusFilter as ContactStatus);
       q = applyTagFilter(q);
       q = applyScoreFilter(q);
+      q = applyStoreFilter(q);
       const { count } = await q;
       return count || 0;
     },
@@ -145,17 +163,18 @@ export default function ContactsPage() {
   });
 
   const { data: contacts = [], isLoading } = useQuery({
-    queryKey: ["contacts", companyId, search, page, pageSize, statusFilter, tagFilter, tagFilteredIds, scoreFilter],
+    queryKey: ["contacts", companyId, search, page, pageSize, statusFilter, tagFilter, tagFilteredIds, scoreFilter, storeFilter],
     queryFn: async () => {
       let q = supabase
         .from("contacts")
-        .select("*")
+        .select("*, stores(name)")
         .order("created_at", { ascending: false })
         .range(page * pageSize, (page + 1) * pageSize - 1);
       if (search) q = q.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
       if (statusFilter !== "all") q = q.eq("status", statusFilter as ContactStatus);
       q = applyTagFilter(q);
       q = applyScoreFilter(q);
+      q = applyStoreFilter(q);
       const { data } = await q;
       return data || [];
     },
@@ -178,6 +197,7 @@ export default function ContactsPage() {
         email: form.email,
         phone: form.phone || null,
         origin: form.origin,
+        store_id: form.store_id || null,
       });
       if (error) throw error;
     },
@@ -185,7 +205,7 @@ export default function ContactsPage() {
       invalidateContacts();
       toast.success("Contato adicionado!");
       setOpen(false);
-      setForm({ name: "", email: "", phone: "", origin: "Manual" });
+      setForm({ name: "", email: "", phone: "", origin: "Manual", store_id: "" });
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -198,6 +218,7 @@ export default function ContactsPage() {
         email: editContact.email,
         phone: editContact.phone || null,
         status: editContact.status as ContactStatus,
+        store_id: editContact.store_id || null,
       }).eq("id", editContact.id);
       if (error) throw error;
     },
@@ -317,6 +338,16 @@ export default function ContactsPage() {
                 <div><Label>Nome</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required className="mt-1" /></div>
                 <div><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required className="mt-1" /></div>
                 <div><Label>Telefone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="mt-1" /></div>
+                <div>
+                  <Label>Loja</Label>
+                  <Select value={form.store_id || "none"} onValueChange={(v) => setForm({ ...form, store_id: v === "none" ? "" : v })}>
+                    <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhuma</SelectItem>
+                      {allStores.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <Button type="submit" disabled={addContactMut.isPending} className="w-full">{addContactMut.isPending ? "Salvando..." : "Adicionar"}</Button>
               </form>
             </DialogContent>
@@ -369,6 +400,23 @@ export default function ContactsPage() {
             <SelectItem value="inactive">⬜ Inativo (0)</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={storeFilter} onValueChange={(v) => { setStoreFilter(v); setPage(0); }}>
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="Loja" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as lojas</SelectItem>
+            <SelectItem value="none">Sem loja</SelectItem>
+            {allStores.map((s) => (
+              <SelectItem key={s.id} value={s.id}>
+                <span className="flex items-center gap-2">
+                  <Store className="h-3 w-3" />
+                  {s.name}
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Tooltip>
           <TooltipTrigger asChild>
             <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={recalculateScores} disabled={recalculating}>
@@ -399,6 +447,7 @@ export default function ContactsPage() {
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Contato</th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Score</th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Status</th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Loja</th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Origem</th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">Cadastro</th>
               <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">Ações</th>
@@ -445,6 +494,7 @@ export default function ContactsPage() {
                   </td>
                   <td className="px-4 py-4"><ScoreBadge score={(c as any).engagement_score || 0} /></td>
                   <td className="px-6 py-4"><span className={statusClass[c.status] || "badge-neutral"}>{statusLabel[c.status] || c.status}</span></td>
+                  <td className="px-6 py-4 text-sm text-muted-foreground">{(c as any).stores?.name || "-"}</td>
                   <td className="px-6 py-4 text-sm text-muted-foreground">{c.origin || "-"}</td>
                   <td className="px-6 py-4 text-sm text-muted-foreground">{new Date(c.created_at).toLocaleDateString("pt-BR")}</td>
                   <td className="px-6 py-4 text-right">
@@ -455,7 +505,7 @@ export default function ContactsPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditContact({ id: c.id, name: c.name || "", email: c.email, phone: c.phone || "", status: c.status }); }}>
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditContact({ id: c.id, name: c.name || "", email: c.email, phone: c.phone || "", status: c.status, store_id: (c as any).store_id || "" }); }}>
                           <Pencil className="h-4 w-4 mr-2" /> Editar
                         </DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={(e) => { e.stopPropagation(); setDeleteContact({ id: c.id, name: c.name, email: c.email }); }}>
@@ -523,6 +573,16 @@ export default function ContactsPage() {
                     <SelectItem value="inactive">Inativo</SelectItem>
                     <SelectItem value="unsubscribed">Descadastrado</SelectItem>
                     <SelectItem value="bounced">Bounced</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Loja</Label>
+                <Select value={editContact.store_id || "none"} onValueChange={(v) => setEditContact({ ...editContact, store_id: v === "none" ? "" : v })}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhuma</SelectItem>
+                    {allStores.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
