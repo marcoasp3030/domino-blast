@@ -4,10 +4,11 @@ import { Plus, Trash2, Send, Loader2, Pencil, RotateCcw, BarChart3 } from "lucid
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { CampaignWizardDialog } from "@/components/campaigns/CampaignWizardDialog";
 import { CampaignRecipientsDialog } from "@/components/campaigns/CampaignRecipientsDialog";
+import { CampaignProgress } from "@/components/campaigns/CampaignProgress";
 
 const statusClass: Record<string, string> = {
   completed: "badge-success", sending: "badge-info", scheduled: "badge-warning",
@@ -24,6 +25,21 @@ export default function CampaignsPage() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<any>(null);
   const [recipientsCampaign, setRecipientsCampaign] = useState<{ id: string; name: string } | null>(null);
+
+  // Realtime: auto-refresh when campaign status changes
+  useEffect(() => {
+    const channel = supabase
+      .channel("campaigns-realtime")
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "campaigns" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [queryClient]);
 
   const { data: campaigns = [], isLoading } = useQuery({
     queryKey: ["campaigns", companyId],
@@ -150,9 +166,8 @@ export default function CampaignsPage() {
                     </div>
                   )}
                   {c.status === "sending" && (
-                    <div className="flex items-center gap-1.5 text-primary">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span className="text-xs font-medium">Enviando...</span>
+                    <div className="min-w-[200px]">
+                      <CampaignProgress campaignId={c.id} totalRecipients={c.total_recipients || 0} />
                     </div>
                   )}
                 </div>
