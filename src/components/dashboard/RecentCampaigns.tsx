@@ -1,6 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { CampaignProgress } from "@/components/campaigns/CampaignProgress";
 
 const statusClass: Record<string, string> = {
   completed: "badge-success",
@@ -22,6 +24,7 @@ const statusLabel: Record<string, string> = {
 
 export function RecentCampaigns() {
   const { companyId } = useAuth();
+  const queryClient = useQueryClient();
 
   const { data: campaigns = [] } = useQuery({
     queryKey: ["recent-campaigns", companyId],
@@ -35,6 +38,21 @@ export function RecentCampaigns() {
     },
     enabled: !!companyId,
   });
+
+  // Realtime subscription for campaign status changes
+  useEffect(() => {
+    const channel = supabase
+      .channel("recent-campaigns-realtime")
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "campaigns" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["recent-campaigns"] });
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [queryClient]);
 
   return (
     <div className="rounded-xl border border-border bg-card">
@@ -66,7 +84,11 @@ export function RecentCampaigns() {
                 <tr key={c.id} className="border-t border-border hover:bg-muted/50 transition-colors cursor-pointer">
                   <td className="px-6 py-4 font-medium">{c.name}</td>
                   <td className="px-6 py-4">
-                    <span className={statusClass[c.status] || "badge-neutral"}>{statusLabel[c.status] || c.status}</span>
+                    {c.status === "sending" ? (
+                      <CampaignProgress campaignId={c.id} totalRecipients={c.total_recipients || 0} compact />
+                    ) : (
+                      <span className={statusClass[c.status] || "badge-neutral"}>{statusLabel[c.status] || c.status}</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-muted-foreground">{c.total_recipients || 0}</td>
                   <td className="px-6 py-4 text-muted-foreground">{new Date(c.created_at).toLocaleDateString("pt-BR")}</td>
