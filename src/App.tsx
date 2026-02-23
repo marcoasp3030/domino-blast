@@ -17,6 +17,7 @@ import ReportsPage from "./pages/ReportsPage";
 import SettingsPage from "./pages/SettingsPage";
 import WorkflowsPage from "./pages/WorkflowsPage";
 import WorkflowEditorPage from "./pages/WorkflowEditorPage";
+import UsersPage from "./pages/UsersPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -41,6 +42,7 @@ const App = () => (
             <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
             <Route path="/workflows" element={<ProtectedRoute><WorkflowsPage /></ProtectedRoute>} />
             <Route path="/workflows/:id" element={<ProtectedRoute><WorkflowEditorPage /></ProtectedRoute>} />
+            <Route path="/users" element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

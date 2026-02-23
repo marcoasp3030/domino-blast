@@ -1,7 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Users, ListFilter, Palette, Send, Globe,
-  BarChart3, Settings, ChevronLeft, ChevronRight, LogOut, Activity, Zap,
+  BarChart3, Settings, ChevronLeft, ChevronRight, LogOut, Activity, Zap, UsersRound,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -9,22 +9,29 @@ import { useAuth } from "@/hooks/useAuth";
 import nutricarLogo from "@/assets/nutricar-logo.webp";
 
 const navItems = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/" },
-  { icon: Users, label: "Contatos", path: "/contacts" },
-  { icon: ListFilter, label: "Listas & Segmentos", path: "/lists" },
-  { icon: Palette, label: "Templates", path: "/templates" },
-  { icon: Send, label: "Campanhas", path: "/campaigns" },
-  { icon: Zap, label: "Automações", path: "/workflows" },
-  { icon: Activity, label: "Atividades", path: "/activities" },
-  { icon: Globe, label: "Domínios", path: "/domains" },
-  { icon: BarChart3, label: "Relatórios", path: "/reports" },
-  { icon: Settings, label: "Configurações", path: "/settings" },
+  { icon: LayoutDashboard, label: "Dashboard", path: "/", permission: null },
+  { icon: Users, label: "Contatos", path: "/contacts", permission: "contacts" },
+  { icon: ListFilter, label: "Listas & Segmentos", path: "/lists", permission: "lists" },
+  { icon: Palette, label: "Templates", path: "/templates", permission: "templates" },
+  { icon: Send, label: "Campanhas", path: "/campaigns", permission: "campaigns" },
+  { icon: Zap, label: "Automações", path: "/workflows", permission: "workflows" },
+  { icon: Activity, label: "Atividades", path: "/activities", permission: "activities" },
+  { icon: Globe, label: "Domínios", path: "/domains", permission: "domains" },
+  { icon: BarChart3, label: "Relatórios", path: "/reports", permission: "reports" },
+  { icon: UsersRound, label: "Usuários", path: "/users", permission: null, adminOnly: true },
+  { icon: Settings, label: "Configurações", path: "/settings", permission: "settings" },
 ];
 
 export function AppSidebar() {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
-  const { profile, user, signOut } = useAuth();
+  const { profile, user, signOut, isAdmin, hasPermission } = useAuth();
+
+  const visibleItems = navItems.filter((item) => {
+    if (item.adminOnly) return isAdmin;
+    if (item.permission === null) return true;
+    return hasPermission(item.permission);
+  });
 
   const initials = (profile?.full_name || user?.email || "U")
     .split(" ")
@@ -52,7 +59,7 @@ export function AppSidebar() {
       </div>
 
       <nav className="flex-1 space-y-1 p-3 overflow-y-auto">
-        {navItems.map((item) => {
+        {visibleItems.map((item) => {
           const isActive = location.pathname === item.path;
           return (
             <Link key={item.path} to={item.path} className={cn("sidebar-link", isActive && "active")} title={collapsed ? item.label : undefined}>
