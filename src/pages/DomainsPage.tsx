@@ -76,6 +76,7 @@ export default function DomainsPage() {
   const [domain, setDomain] = useState("");
   const [senderForm, setSenderForm] = useState({ from_name: "", from_email: "", reply_to: "", domain_id: "" });
   const [expandedDomain, setExpandedDomain] = useState<string | null>(null);
+  const [verifyingId, setVerifyingId] = useState<string | null>(null);
 
   const { data: domains = [], isLoading } = useQuery({
     queryKey: ["domains", companyId],
@@ -94,6 +95,26 @@ export default function DomainsPage() {
     },
     enabled: !!companyId,
   });
+
+  const verifyDomain = async (domainId: string) => {
+    setVerifyingId(domainId);
+    try {
+      const { data, error } = await supabase.functions.invoke("verify-domain", {
+        body: { domain_id: domainId },
+      });
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ["domains"] });
+      if (data.overall_status === "validated") {
+        toast.success("Domínio verificado com sucesso! ✅");
+      } else {
+        toast.info("Verificação concluída. Alguns registros ainda não foram detectados.");
+      }
+    } catch (e: any) {
+      toast.error("Erro ao verificar: " + e.message);
+    } finally {
+      setVerifyingId(null);
+    }
+  };
 
   const addDomain = useMutation({
     mutationFn: async () => {
@@ -204,6 +225,16 @@ export default function DomainsPage() {
                     </div>
                   </div>
                   <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      onClick={() => verifyDomain(d.id)}
+                      disabled={verifyingId === d.id}
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 ${verifyingId === d.id ? "animate-spin" : ""}`} />
+                      {verifyingId === d.id ? "Verificando..." : "Verificar DNS"}
+                    </Button>
                     <Button variant="outline" size="sm" className="gap-2" onClick={() => setExpandedDomain(isExpanded ? null : d.id)}>
                       {isExpanded ? "Ocultar DNS" : "Ver DNS"}
                     </Button>
