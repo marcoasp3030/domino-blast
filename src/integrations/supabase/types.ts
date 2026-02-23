@@ -222,12 +222,14 @@ export type Database = {
           company_name: string | null
           created_at: string
           email: string
+          engagement_score: number
           id: string
           lgpd_consent: boolean | null
           lgpd_consent_date: string | null
           name: string | null
           origin: string | null
           phone: string | null
+          score_updated_at: string | null
           status: Database["public"]["Enums"]["contact_status"]
           updated_at: string
         }
@@ -236,12 +238,14 @@ export type Database = {
           company_name?: string | null
           created_at?: string
           email: string
+          engagement_score?: number
           id?: string
           lgpd_consent?: boolean | null
           lgpd_consent_date?: string | null
           name?: string | null
           origin?: string | null
           phone?: string | null
+          score_updated_at?: string | null
           status?: Database["public"]["Enums"]["contact_status"]
           updated_at?: string
         }
@@ -250,12 +254,14 @@ export type Database = {
           company_name?: string | null
           created_at?: string
           email?: string
+          engagement_score?: number
           id?: string
           lgpd_consent?: boolean | null
           lgpd_consent_date?: string | null
           name?: string | null
           origin?: string | null
           phone?: string | null
+          score_updated_at?: string | null
           status?: Database["public"]["Enums"]["contact_status"]
           updated_at?: string
         }
@@ -729,6 +735,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_engagement_score: {
+        Args: { _contact_id: string }
+        Returns: number
+      }
       get_campaign_performance: {
         Args: { _company_id: string }
         Returns: {
@@ -766,6 +776,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      recalculate_company_scores: {
+        Args: { _company_id: string }
+        Returns: number
       }
     }
     Enums: {
