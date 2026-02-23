@@ -3,23 +3,70 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Send, CheckCircle2, Eye, MousePointerClick, AlertTriangle, ShieldAlert } from "lucide-react";
 
-export function StatsCards() {
+interface StatsCardsProps {
+  storeFilter?: string;
+}
+
+export function StatsCards({ storeFilter = "all" }: StatsCardsProps) {
   const { companyId } = useAuth();
 
+  // Get campaign IDs for the selected store
+  const { data: storeCampaignIds } = useQuery({
+    queryKey: ["dashboard-store-campaign-ids", companyId, storeFilter],
+    queryFn: async () => {
+      if (storeFilter === "all") return null;
+      let q = supabase.from("campaigns").select("id");
+      if (storeFilter === "none") q = q.is("store_id", null);
+      else q = q.eq("store_id", storeFilter);
+      const { data } = await q;
+      return (data || []).map((c) => c.id);
+    },
+    enabled: !!companyId,
+  });
+
   const { data: stats } = useQuery({
-    queryKey: ["dashboard-stats", companyId],
+    queryKey: ["dashboard-stats", companyId, storeFilter, storeCampaignIds],
     queryFn: async () => {
       if (!companyId) return null;
 
-      const [sendsRes, eventCountsRes, contactsRes] = await Promise.all([
-        supabase.from("sends").select("id", { count: "exact", head: true }),
-        supabase.rpc("get_event_counts", { _company_id: companyId }),
-        supabase.from("contacts").select("id", { count: "exact", head: true }),
+      if (storeFilter === "all") {
+        const [sendsRes, eventCountsRes, contactsRes] = await Promise.all([
+          supabase.from("sends").select("id", { count: "exact", head: true }),
+          supabase.rpc("get_event_counts", { _company_id: companyId }),
+          supabase.from("contacts").select("id", { count: "exact", head: true }),
+        ]);
+
+        const totalSent = sendsRes.count || 0;
+        const counts: Record<string, number> = {};
+        (eventCountsRes.data || []).forEach((r: any) => { counts[r.event_type] = Number(r.count); });
+
+        return {
+          totalSent,
+          delivered: counts.delivered || 0,
+          opened: counts.open || 0,
+          clicked: counts.click || 0,
+          bounced: counts.bounce || 0,
+          spam: counts.spam || 0,
+          totalContacts: contactsRes.count || 0,
+        };
+      }
+
+      // Filtered by store
+      if (!storeCampaignIds || storeCampaignIds.length === 0) {
+        return { totalSent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, spam: 0, totalContacts: 0 };
+      }
+
+      const [sendsRes, eventsRes, contactsRes] = await Promise.all([
+        supabase.from("sends").select("id", { count: "exact", head: true }).in("campaign_id", storeCampaignIds),
+        supabase.from("events").select("event_type").in("campaign_id", storeCampaignIds),
+        storeFilter === "none"
+          ? supabase.from("contacts").select("id", { count: "exact", head: true }).is("store_id", null)
+          : supabase.from("contacts").select("id", { count: "exact", head: true }).eq("store_id", storeFilter),
       ]);
 
       const totalSent = sendsRes.count || 0;
       const counts: Record<string, number> = {};
-      (eventCountsRes.data || []).forEach((r: any) => { counts[r.event_type] = Number(r.count); });
+      (eventsRes.data || []).forEach((r: any) => { counts[r.event_type] = (counts[r.event_type] || 0) + 1; });
 
       return {
         totalSent,
@@ -31,7 +78,7 @@ export function StatsCards() {
         totalContacts: contactsRes.count || 0,
       };
     },
-    enabled: !!companyId,
+    enabled: !!companyId && (storeFilter === "all" || storeCampaignIds !== undefined),
   });
 
   const cards = [

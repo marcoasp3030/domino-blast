@@ -4,14 +4,21 @@ import { useAuth } from "@/hooks/useAuth";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { TrendingUp } from "lucide-react";
 
-export function CampaignPerformanceChart() {
+interface CampaignPerformanceChartProps {
+  storeFilter?: string;
+}
+
+export function CampaignPerformanceChart({ storeFilter = "all" }: CampaignPerformanceChartProps) {
   const { companyId } = useAuth();
 
   const { data: campaigns = [] } = useQuery({
-    queryKey: ["perf-campaigns", companyId],
+    queryKey: ["perf-campaigns", companyId, storeFilter],
     queryFn: async () => {
-      const { data } = await supabase.from("campaigns").select("id, name, total_recipients, created_at, status")
+      let q = supabase.from("campaigns").select("id, name, total_recipients, created_at, status")
         .order("created_at", { ascending: true }).limit(14);
+      if (storeFilter === "none") q = q.is("store_id", null);
+      else if (storeFilter !== "all") q = q.eq("store_id", storeFilter);
+      const { data } = await q;
       return data || [];
     },
     enabled: !!companyId,
