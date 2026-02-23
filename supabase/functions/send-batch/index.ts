@@ -45,6 +45,9 @@ Deno.serve(async (req) => {
 
     console.log(`[Batch ${batch_index + 1}/${total_batches}] Processing ${contacts.length} contacts for campaign ${campaign_id}`);
 
+    // Build unsubscribe URL base
+    const unsubscribeBase = `${supabaseUrl}/functions/v1/unsubscribe`;
+
     let sent = 0;
     let failed = 0;
 
@@ -96,17 +99,18 @@ Deno.serve(async (req) => {
         };
       });
 
-      // Personalize HTML per contact using substitutions is limited,
-      // so we send individual calls if personalization is needed in body
-      const hasBodyPersonalization = html_content.includes("{{name}}") || html_content.includes("{{email}}");
+      // Check if body needs per-contact personalization (name, email, or unsubscribe URL)
+      const hasBodyPersonalization = html_content.includes("{{name}}") || html_content.includes("{{email}}") || html_content.includes("{{unsubscribe_url}}");
 
       if (hasBodyPersonalization) {
         // Send individually when body has personalization tags
         for (const contact of sgBatch) {
           try {
+            const unsubscribeUrl = `${unsubscribeBase}?contact_id=${contact.id}&campaign_id=${campaign_id}`;
             const personalizedHtml = html_content
               .replace(/\{\{name\}\}/g, contact.name || "")
-              .replace(/\{\{email\}\}/g, contact.email);
+              .replace(/\{\{email\}\}/g, contact.email)
+              .replace(/\{\{unsubscribe_url\}\}/g, unsubscribeUrl);
 
             const sgResponse = await fetch("https://api.sendgrid.com/v3/mail/send", {
               method: "POST",
