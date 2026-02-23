@@ -4,17 +4,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Mail, Lock, User, Building2 } from "lucide-react";
+import { Mail, Lock } from "lucide-react";
 import { toast } from "sonner";
 import nutricarLogo from "@/assets/nutricar-logo.webp";
 
 export default function AuthPage() {
-  const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [companyName, setCompanyName] = useState("");
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -22,26 +19,10 @@ export default function AuthPage() {
     setLoading(true);
 
     try {
-      if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        toast.success("Login realizado com sucesso!");
-        navigate("/");
-      } else {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              full_name: fullName,
-              company_name: companyName,
-            },
-          },
-        });
-        if (error) throw error;
-        toast.success("Conta criada com sucesso!");
-        navigate("/");
-      }
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      toast.success("Login realizado com sucesso!");
+      navigate("/");
     } catch (error: any) {
       toast.error(error.message || "Erro na autenticação");
     } finally {
@@ -55,30 +36,10 @@ export default function AuthPage() {
         <div className="mb-8 text-center">
           <img src={nutricarLogo} alt="Nutricar Brasil" className="mx-auto mb-4 h-16 object-contain" />
           <h1 className="text-2xl font-bold">Nutricar Brasil</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {isLogin ? "Entre na sua conta" : "Crie sua conta"}
-          </p>
+          <p className="text-sm text-muted-foreground mt-1">Entre na sua conta</p>
         </div>
 
         <form onSubmit={handleSubmit} className="rounded-xl border border-border bg-card p-6 space-y-4">
-          {!isLogin && (
-            <>
-              <div>
-                <Label htmlFor="fullName">Nome completo</Label>
-                <div className="relative mt-1.5">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Seu nome" className="pl-9" required />
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="companyName">Nome da empresa</Label>
-                <div className="relative mt-1.5">
-                  <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input id="companyName" value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Sua empresa" className="pl-9" required />
-                </div>
-              </div>
-            </>
-          )}
           <div>
             <Label htmlFor="email">Email</Label>
             <div className="relative mt-1.5">
@@ -95,14 +56,11 @@ export default function AuthPage() {
           </div>
 
           <Button type="submit" className="w-full" style={{ background: "#88BE46", color: "#fff" }} disabled={loading}>
-            {loading ? "Carregando..." : isLogin ? "Entrar" : "Criar conta"}
+            {loading ? "Carregando..." : "Entrar"}
           </Button>
 
-          <p className="text-center text-sm text-muted-foreground">
-            {isLogin ? "Não tem conta?" : "Já tem conta?"}{" "}
-            <button type="button" onClick={() => setIsLogin(!isLogin)} className="font-medium hover:underline" style={{ color: "#88BE46" }}>
-              {isLogin ? "Cadastre-se" : "Faça login"}
-            </button>
+          <p className="text-center text-xs text-muted-foreground">
+            Acesso restrito. Solicite suas credenciais ao administrador.
           </p>
         </form>
       </div>
