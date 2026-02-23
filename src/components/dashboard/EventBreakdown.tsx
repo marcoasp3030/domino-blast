@@ -24,12 +24,31 @@ const labelMap: Record<string, string> = {
   dropped: "Dropped",
 };
 
-export function EventBreakdown() {
+export function EventBreakdown({ storeFilter = "all" }: { storeFilter?: string }) {
   const { companyId } = useAuth();
 
   const { data: eventData = [] } = useQuery({
-    queryKey: ["event-breakdown", companyId],
+    queryKey: ["event-breakdown", companyId, storeFilter],
     queryFn: async () => {
+      if (storeFilter !== "all") {
+        let q = supabase.from("campaigns").select("id");
+        if (storeFilter === "none") q = q.is("store_id", null);
+        else q = q.eq("store_id", storeFilter);
+        const { data: camps } = await q;
+        const ids = (camps || []).map((c) => c.id);
+        if (ids.length === 0) return [];
+        const { data: events } = await supabase
+          .from("events")
+          .select("event_type")
+          .in("campaign_id", ids);
+        const counts: Record<string, number> = {};
+        (events || []).forEach((e) => { counts[e.event_type] = (counts[e.event_type] || 0) + 1; });
+        return Object.entries(counts).map(([name, value]) => ({
+          name: labelMap[name] || name,
+          value,
+          color: colorMap[name] || "hsl(220, 10%, 46%)",
+        }));
+      }
       const { data } = await supabase.rpc("get_event_counts", { _company_id: companyId });
       const counts: Record<string, number> = {};
       (data || []).forEach((r: any) => { counts[r.event_type] = Number(r.count); });

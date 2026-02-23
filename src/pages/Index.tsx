@@ -53,11 +53,11 @@ const Index = () => {
         <div className="lg:col-span-2">
           <CampaignPerformanceChart storeFilter={storeFilter} />
         </div>
-        <EventBreakdown />
+        <EventBreakdown storeFilter={storeFilter} />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <RecentCampaigns />
+        <RecentCampaigns storeFilter={storeFilter} />
         <EventLogPanel />
       </div>
     </AppLayout>
