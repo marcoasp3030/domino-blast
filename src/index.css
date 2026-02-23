@@ -15,7 +15,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 220 25% 10%;
 
-    --primary: 199 89% 48%;
+    --primary: 88 52% 51%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 220 14% 92%;
@@ -24,8 +24,8 @@
     --muted: 220 14% 95%;
     --muted-foreground: 220 10% 46%;
 
-    --accent: 199 89% 94%;
-    --accent-foreground: 199 89% 30%;
+    --accent: 88 52% 92%;
+    --accent-foreground: 88 52% 30%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
@@ -36,12 +36,12 @@
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
 
-    --info: 199 89% 48%;
+    --info: 88 52% 51%;
     --info-foreground: 0 0% 100%;
 
     --border: 220 13% 91%;
     --input: 220 13% 91%;
-    --ring: 199 89% 48%;
+    --ring: 88 52% 51%;
 
     --radius: 0.625rem;
 
@@ -55,14 +55,14 @@
     --sidebar-ring: 88 52% 51%;
     --sidebar-muted: 220 25% 14%;
 
-    --chart-sent: 199 89% 48%;
+    --chart-sent: 88 52% 51%;
     --chart-delivered: 152 69% 40%;
     --chart-opened: 262 83% 58%;
     --chart-clicked: 38 92% 50%;
     --chart-bounced: 0 72% 51%;
     --chart-spam: 350 80% 55%;
 
-    --gradient-primary: linear-gradient(135deg, hsl(199, 89%, 48%), hsl(210, 78%, 42%));
+    --gradient-primary: linear-gradient(135deg, hsl(88, 52%, 51%), hsl(95, 45%, 42%));
     --gradient-success: linear-gradient(135deg, hsl(152, 69%, 40%), hsl(160, 60%, 45%));
     --gradient-warning: linear-gradient(135deg, hsl(38, 92%, 50%), hsl(28, 85%, 55%));
     --gradient-danger: linear-gradient(135deg, hsl(0, 72%, 51%), hsl(350, 65%, 55%));
@@ -77,19 +77,19 @@
     --card-foreground: 220 14% 90%;
     --popover: 220 25% 13%;
     --popover-foreground: 220 14% 90%;
-    --primary: 199 89% 48%;
+    --primary: 88 52% 51%;
     --primary-foreground: 0 0% 100%;
     --secondary: 220 25% 16%;
     --secondary-foreground: 220 14% 90%;
     --muted: 220 25% 14%;
     --muted-foreground: 220 10% 55%;
     --accent: 220 25% 18%;
-    --accent-foreground: 199 89% 60%;
+    --accent-foreground: 88 52% 60%;
     --destructive: 0 62% 30.6%;
     --destructive-foreground: 210 40% 98%;
     --border: 220 25% 18%;
     --input: 220 25% 18%;
-    --ring: 199 89% 48%;
+    --ring: 88 52% 51%;
   }
 }
 
