@@ -57,6 +57,13 @@ export type Database = {
       }
       campaigns: {
         Row: {
+          ab_test_enabled: boolean
+          ab_test_sample_percent: number
+          ab_test_sent_at: string | null
+          ab_test_status: string | null
+          ab_test_wait_hours: number
+          ab_test_winner: string | null
+          ab_test_winner_sent_at: string | null
           batch_delay_seconds: number | null
           batch_size: number | null
           company_id: string
@@ -72,6 +79,7 @@ export type Database = {
           sent_at: string | null
           status: Database["public"]["Enums"]["campaign_status"]
           subject: string | null
+          subject_b: string | null
           template_id: string | null
           total_recipients: number | null
           updated_at: string
@@ -80,6 +88,13 @@ export type Database = {
           utm_source: string | null
         }
         Insert: {
+          ab_test_enabled?: boolean
+          ab_test_sample_percent?: number
+          ab_test_sent_at?: string | null
+          ab_test_status?: string | null
+          ab_test_wait_hours?: number
+          ab_test_winner?: string | null
+          ab_test_winner_sent_at?: string | null
           batch_delay_seconds?: number | null
           batch_size?: number | null
           company_id: string
@@ -95,6 +110,7 @@ export type Database = {
           sent_at?: string | null
           status?: Database["public"]["Enums"]["campaign_status"]
           subject?: string | null
+          subject_b?: string | null
           template_id?: string | null
           total_recipients?: number | null
           updated_at?: string
@@ -103,6 +119,13 @@ export type Database = {
           utm_source?: string | null
         }
         Update: {
+          ab_test_enabled?: boolean
+          ab_test_sample_percent?: number
+          ab_test_sent_at?: string | null
+          ab_test_status?: string | null
+          ab_test_wait_hours?: number
+          ab_test_winner?: string | null
+          ab_test_winner_sent_at?: string | null
           batch_delay_seconds?: number | null
           batch_size?: number | null
           company_id?: string
@@ -118,6 +141,7 @@ export type Database = {
           sent_at?: string | null
           status?: Database["public"]["Enums"]["campaign_status"]
           subject?: string | null
+          subject_b?: string | null
           template_id?: string | null
           total_recipients?: number | null
           updated_at?: string

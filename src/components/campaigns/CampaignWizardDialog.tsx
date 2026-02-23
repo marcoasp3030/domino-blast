@@ -5,11 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { CheckCircle2, ChevronLeft, ChevronRight, FileText, Users, Send, Calendar } from "lucide-react";
+import { CheckCircle2, ChevronLeft, ChevronRight, FileText, Users, Send, Calendar, FlaskConical } from "lucide-react";
 
 const STEPS = [
   { label: "Informações", icon: FileText },
@@ -37,6 +38,8 @@ export function CampaignWizardDialog({ open, onOpenChange, editCampaign }: Props
     template_id: "", list_id: "", sender_id: "",
     scheduled_at: "", send_now: true,
     utm_source: "", utm_medium: "email", utm_campaign: "",
+    ab_test_enabled: false, subject_b: "",
+    ab_test_sample_percent: 20, ab_test_wait_hours: 4,
   };
 
   const [form, setForm] = useState(defaultForm);
@@ -56,6 +59,10 @@ export function CampaignWizardDialog({ open, onOpenChange, editCampaign }: Props
         utm_source: editCampaign.utm_source || "",
         utm_medium: editCampaign.utm_medium || "email",
         utm_campaign: editCampaign.utm_campaign || "",
+        ab_test_enabled: editCampaign.ab_test_enabled || false,
+        subject_b: editCampaign.subject_b || "",
+        ab_test_sample_percent: editCampaign.ab_test_sample_percent || 20,
+        ab_test_wait_hours: editCampaign.ab_test_wait_hours || 4,
       });
       setStep(0);
     } else if (!open) {
@@ -83,7 +90,7 @@ export function CampaignWizardDialog({ open, onOpenChange, editCampaign }: Props
   });
 
   const canNext = () => {
-    if (step === 0) return form.name && form.subject;
+    if (step === 0) return form.name && form.subject && (!form.ab_test_enabled || form.subject_b);
     if (step === 1) return form.list_id;
     if (step === 2) return true;
     return true;
@@ -96,7 +103,7 @@ export function CampaignWizardDialog({ open, onOpenChange, editCampaign }: Props
       const selectedList = lists.find((l: any) => l.id === form.list_id);
       const totalRecipients = selectedList?.list_members?.length || 0;
 
-      const payload = {
+      const payload: any = {
         company_id: companyId,
         created_by: user?.id,
         name: form.name,
@@ -111,6 +118,10 @@ export function CampaignWizardDialog({ open, onOpenChange, editCampaign }: Props
         utm_source: form.utm_source || null,
         utm_medium: form.utm_medium || null,
         utm_campaign: form.utm_campaign || form.name || null,
+        ab_test_enabled: form.ab_test_enabled,
+        subject_b: form.ab_test_enabled ? form.subject_b : null,
+        ab_test_sample_percent: form.ab_test_enabled ? form.ab_test_sample_percent : 20,
+        ab_test_wait_hours: form.ab_test_enabled ? form.ab_test_wait_hours : 4,
       };
 
       if (isEditing) {
@@ -161,7 +172,57 @@ export function CampaignWizardDialog({ open, onOpenChange, editCampaign }: Props
           {step === 0 && (
             <div className="space-y-4">
               <div><Label>Nome da campanha *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex: Newsletter Janeiro" className="mt-1" required /></div>
-              <div><Label>Assunto do email *</Label><Input value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} placeholder="Ex: Confira as novidades!" className="mt-1" required /></div>
+              <div><Label>Assunto do email * (Variação A)</Label><Input value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} placeholder="Ex: Confira as novidades!" className="mt-1" required /></div>
+
+              {/* A/B Test toggle */}
+              <div className="flex items-center justify-between rounded-lg border border-border p-3 bg-muted/50">
+                <div className="flex items-center gap-2">
+                  <FlaskConical className="h-4 w-4 text-primary" />
+                  <div>
+                    <p className="text-sm font-medium">Teste A/B de assunto</p>
+                    <p className="text-xs text-muted-foreground">Compare duas variações e envie a melhor</p>
+                  </div>
+                </div>
+                <Switch checked={form.ab_test_enabled} onCheckedChange={(v) => setForm({ ...form, ab_test_enabled: v })} />
+              </div>
+
+              {form.ab_test_enabled && (
+                <div className="space-y-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
+                  <div><Label>Assunto - Variação B *</Label><Input value={form.subject_b} onChange={(e) => setForm({ ...form, subject_b: e.target.value })} placeholder="Ex: Não perca essas novidades!" className="mt-1" required /></div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs">Amostra de teste (%)</Label>
+                      <Select value={String(form.ab_test_sample_percent)} onValueChange={(v) => setForm({ ...form, ab_test_sample_percent: Number(v) })}>
+                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="10">10%</SelectItem>
+                          <SelectItem value="20">20%</SelectItem>
+                          <SelectItem value="30">30%</SelectItem>
+                          <SelectItem value="40">40%</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Aguardar resultado (horas)</Label>
+                      <Select value={String(form.ab_test_wait_hours)} onValueChange={(v) => setForm({ ...form, ab_test_wait_hours: Number(v) })}>
+                        <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">1 hora</SelectItem>
+                          <SelectItem value="2">2 horas</SelectItem>
+                          <SelectItem value="4">4 horas</SelectItem>
+                          <SelectItem value="8">8 horas</SelectItem>
+                          <SelectItem value="12">12 horas</SelectItem>
+                          <SelectItem value="24">24 horas</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {form.ab_test_sample_percent / 2}% receberão A, {form.ab_test_sample_percent / 2}% receberão B. Após {form.ab_test_wait_hours}h, os {100 - form.ab_test_sample_percent}% restantes receberão o vencedor.
+                  </p>
+                </div>
+              )}
+
               <div><Label>Preheader</Label><Input value={form.preheader} onChange={(e) => setForm({ ...form, preheader: e.target.value })} placeholder="Texto que aparece ao lado do assunto" className="mt-1" /></div>
               <div>
                 <Label>Template</Label>
@@ -234,7 +295,13 @@ export function CampaignWizardDialog({ open, onOpenChange, editCampaign }: Props
               <div className="bg-muted rounded-lg p-4 text-sm space-y-1">
                 <p className="font-semibold">Resumo</p>
                 <p>Campanha: {form.name || "-"}</p>
-                <p>Assunto: {form.subject || "-"}</p>
+                <p>Assunto A: {form.subject || "-"}</p>
+                {form.ab_test_enabled && <p>Assunto B: {form.subject_b || "-"}</p>}
+                {form.ab_test_enabled && (
+                  <p className="text-primary font-medium">
+                    🧪 Teste A/B: {form.ab_test_sample_percent}% de amostra, {form.ab_test_wait_hours}h de espera
+                  </p>
+                )}
                 <p>Lista: {lists.find((l: any) => l.id === form.list_id)?.name || "-"}</p>
                 <p>Remetente: {senders.find((s) => s.id === form.sender_id)?.from_email || "Padrão"}</p>
               </div>
