@@ -1,7 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Users, ListFilter, Palette, Send, Globe,
-  BarChart3, Settings, ChevronLeft, ChevronRight, LogOut, Activity,
+  BarChart3, Settings, ChevronLeft, ChevronRight, LogOut, Activity, Zap,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,7 @@ const navItems = [
   { icon: ListFilter, label: "Listas & Segmentos", path: "/lists" },
   { icon: Palette, label: "Templates", path: "/templates" },
   { icon: Send, label: "Campanhas", path: "/campaigns" },
+  { icon: Zap, label: "Automações", path: "/workflows" },
   { icon: Activity, label: "Atividades", path: "/activities" },
   { icon: Globe, label: "Domínios", path: "/domains" },
   { icon: BarChart3, label: "Relatórios", path: "/reports" },
