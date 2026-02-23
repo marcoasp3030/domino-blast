@@ -42,6 +42,27 @@ async function checkDmarc(domain: string): Promise<string> {
   return hasDmarc ? "validated" : "pending";
 }
 
+async function verifyAndUpdate(supabase: any, domainRow: { id: string; domain: string }) {
+  console.log(`Verifying DNS for ${domainRow.domain}...`);
+  const [spf, dkim, dmarc] = await Promise.all([
+    checkSpf(domainRow.domain),
+    checkDkim(domainRow.domain),
+    checkDmarc(domainRow.domain),
+  ]);
+  const allValidated = spf === "validated" && dkim === "validated" && dmarc === "validated";
+  const anyError = [spf, dkim, dmarc].includes("error");
+  const overall = allValidated ? "validated" : anyError ? "error" : "validating";
+
+  await supabase
+    .from("domains")
+    .update({ spf_status: spf, dkim_status: dkim, dmarc_status: dmarc, overall_status: overall })
+    .eq("id", domainRow.id);
+
+  const result = { domain: domainRow.domain, spf_status: spf, dkim_status: dkim, dmarc_status: dmarc, overall_status: overall };
+  console.log(`Result:`, result);
+  return result;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -52,59 +73,50 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
-    const { domain_id } = await req.json();
-    if (!domain_id) {
-      return new Response(JSON.stringify({ error: "domain_id required" }), {
-        status: 400,
+    let body: any = {};
+    try { body = await req.json(); } catch { /* empty body = batch mode */ }
+
+    // Single domain mode
+    if (body.domain_id) {
+      const { data: domainRow } = await supabase
+        .from("domains")
+        .select("id, domain")
+        .eq("id", body.domain_id)
+        .single();
+
+      if (!domainRow) {
+        return new Response(JSON.stringify({ error: "Domain not found" }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const result = await verifyAndUpdate(supabase, domainRow);
+      return new Response(JSON.stringify(result), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Get domain
-    const { data: domainRow } = await supabase
+    // Batch mode: verify all non-validated domains
+    const { data: pendingDomains } = await supabase
       .from("domains")
       .select("id, domain")
-      .eq("id", domain_id)
-      .single();
+      .neq("overall_status", "validated");
 
-    if (!domainRow) {
-      return new Response(JSON.stringify({ error: "Domain not found" }), {
-        status: 404,
+    if (!pendingDomains || pendingDomains.length === 0) {
+      console.log("No pending domains to verify");
+      return new Response(JSON.stringify({ message: "No pending domains", count: 0 }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    console.log(`Verifying DNS for ${domainRow.domain}...`);
+    console.log(`Batch verifying ${pendingDomains.length} domain(s)...`);
+    const results = [];
+    for (const d of pendingDomains) {
+      results.push(await verifyAndUpdate(supabase, d));
+    }
 
-    // Run checks in parallel
-    const [spf, dkim, dmarc] = await Promise.all([
-      checkSpf(domainRow.domain),
-      checkDkim(domainRow.domain),
-      checkDmarc(domainRow.domain),
-    ]);
-
-    // Calculate overall
-    const allValidated = spf === "validated" && dkim === "validated" && dmarc === "validated";
-    const anyError = [spf, dkim, dmarc].includes("error");
-    const overall = allValidated ? "validated" : anyError ? "error" : "validating";
-
-    // Update domain
-    const { error: updateErr } = await supabase
-      .from("domains")
-      .update({
-        spf_status: spf,
-        dkim_status: dkim,
-        dmarc_status: dmarc,
-        overall_status: overall,
-      })
-      .eq("id", domain_id);
-
-    if (updateErr) throw updateErr;
-
-    const result = { spf_status: spf, dkim_status: dkim, dmarc_status: dmarc, overall_status: overall };
-    console.log(`DNS verification result for ${domainRow.domain}:`, result);
-
-    return new Response(JSON.stringify(result), {
+    return new Response(JSON.stringify({ count: results.length, results }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err: any) {
