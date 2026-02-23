@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { ResponseTimeChart } from "@/components/activities/ResponseTimeChart";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -300,6 +301,11 @@ export default function ActivitiesPage() {
           </div>
           <p className="text-xl font-bold">{stats.avgClick !== null ? formatDuration(stats.avgClick) : "—"}</p>
         </div>
+      </div>
+
+      {/* Response Time Chart */}
+      <div className="mb-6">
+        <ResponseTimeChart engagements={engagements} />
       </div>
 
       {/* Toolbar */}
