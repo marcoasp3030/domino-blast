@@ -12,7 +12,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Validate auth
     const authHeader = req.headers.get("authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -83,7 +82,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get list members with contact emails
     if (!campaign.list_id) {
       return new Response(JSON.stringify({ error: "Campaign has no list assigned" }), {
         status: 400,
@@ -91,30 +89,75 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { data: members } = await supabase
-      .from("list_members")
-      .select("contact_id, contacts(id, email, name, status)")
-      .eq("list_id", campaign.list_id);
+    // Fetch ALL list members with pagination (no 1000 row limit)
+    const allContacts: { id: string; email: string; name: string | null }[] = [];
+    const PAGE_SIZE = 1000;
+    let offset = 0;
+    let hasMore = true;
 
-    const activeContacts = (members || [])
-      .filter((m: any) => m.contacts?.status === "active" && m.contacts?.email)
-      .map((m: any) => m.contacts);
+    while (hasMore) {
+      const { data: members } = await supabase
+        .from("list_members")
+        .select("contact_id, contacts(id, email, name, status)")
+        .eq("list_id", campaign.list_id)
+        .range(offset, offset + PAGE_SIZE - 1);
 
-    if (activeContacts.length === 0) {
+      if (!members || members.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      for (const m of members as any[]) {
+        if (m.contacts?.status === "active" && m.contacts?.email) {
+          allContacts.push({
+            id: m.contacts.id,
+            email: m.contacts.email,
+            name: m.contacts.name,
+          });
+        }
+      }
+
+      offset += PAGE_SIZE;
+      if (members.length < PAGE_SIZE) hasMore = false;
+    }
+
+    if (allContacts.length === 0) {
       return new Response(JSON.stringify({ error: "No active contacts in list" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Check suppressions
-    const { data: suppressions } = await supabase
-      .from("suppressions")
-      .select("email")
-      .eq("company_id", campaign.company_id);
+    // Check suppressions (also paginated)
+    const suppressedEmails = new Set<string>();
+    offset = 0;
+    hasMore = true;
+    while (hasMore) {
+      const { data: suppressions } = await supabase
+        .from("suppressions")
+        .select("email")
+        .eq("company_id", campaign.company_id)
+        .range(offset, offset + PAGE_SIZE - 1);
 
-    const suppressedEmails = new Set((suppressions || []).map((s: any) => s.email.toLowerCase()));
-    const contacts = activeContacts.filter((c: any) => !suppressedEmails.has(c.email.toLowerCase()));
+      if (!suppressions || suppressions.length === 0) {
+        hasMore = false;
+        break;
+      }
+      for (const s of suppressions) {
+        suppressedEmails.add(s.email.toLowerCase());
+      }
+      offset += PAGE_SIZE;
+      if (suppressions.length < PAGE_SIZE) hasMore = false;
+    }
+
+    const contacts = allContacts.filter((c) => !suppressedEmails.has(c.email.toLowerCase()));
+
+    if (contacts.length === 0) {
+      return new Response(JSON.stringify({ error: "All contacts are suppressed" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Update campaign status to sending
     await supabase.from("campaigns").update({
@@ -123,122 +166,64 @@ Deno.serve(async (req) => {
       total_recipients: contacts.length,
     }).eq("id", campaign_id);
 
-    // Determine sender
-    const fromEmail = campaign.senders?.from_email || "noreply@example.com";
-    const fromName = campaign.senders?.from_name || "MailPulse";
-    const replyTo = campaign.senders?.reply_to || fromEmail;
-
+    // Prepare batch parameters
+    const senderInfo = {
+      from_email: campaign.senders?.from_email || "noreply@example.com",
+      from_name: campaign.senders?.from_name || "Nutricar",
+      reply_to: campaign.senders?.reply_to || campaign.senders?.from_email || "noreply@example.com",
+    };
     const htmlContent = campaign.email_templates?.html_content || `<p>${campaign.subject || "Email"}</p>`;
 
-    // Send emails in batches
-    const batchSize = campaign.batch_size || 50;
-    let sent = 0;
-    let failed = 0;
-    const errors: string[] = [];
+    // Split contacts into batches and invoke send-batch for each
+    const BATCH_SIZE = campaign.batch_size || 200;
+    const batchDelayMs = (campaign.batch_delay_seconds || 2) * 1000;
+    const totalBatches = Math.ceil(contacts.length / BATCH_SIZE);
+    let batchesQueued = 0;
 
-    for (let i = 0; i < contacts.length; i += batchSize) {
-      const batch = contacts.slice(i, i + batchSize);
+    for (let i = 0; i < contacts.length; i += BATCH_SIZE) {
+      const batchContacts = contacts.slice(i, i + BATCH_SIZE);
+      const batchIndex = Math.floor(i / BATCH_SIZE);
 
-      for (const contact of batch) {
-        try {
-          // Create send record
-          const { data: sendRecord } = await supabase.from("sends").insert({
-            campaign_id,
-            contact_id: contact.id,
-            status: "queued",
-          }).select("id").single();
+      // Fire-and-forget: invoke send-batch
+      const batchPayload = {
+        campaign_id,
+        company_id: campaign.company_id,
+        subject: campaign.subject || "Sem assunto",
+        html_content: htmlContent,
+        sender: senderInfo,
+        contacts: batchContacts,
+        batch_index: batchIndex,
+        total_batches: totalBatches,
+        is_last_batch: batchIndex === totalBatches - 1,
+      };
 
-          // Personalize HTML
-          const personalizedHtml = htmlContent
-            .replace(/\{\{name\}\}/g, contact.name || "")
-            .replace(/\{\{email\}\}/g, contact.email);
+      // Use fetch to invoke the sibling function
+      fetch(`${supabaseUrl}/functions/v1/send-batch`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${supabaseServiceKey}`,
+        },
+        body: JSON.stringify(batchPayload),
+      }).catch((err) => {
+        console.error(`Failed to invoke batch ${batchIndex}:`, err);
+      });
 
-          // Send via SendGrid
-          const sgResponse = await fetch("https://api.sendgrid.com/v3/mail/send", {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${sendgridKey}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              personalizations: [{ to: [{ email: contact.email, name: contact.name || undefined }] }],
-              from: { email: fromEmail, name: fromName },
-              reply_to: { email: replyTo },
-              subject: campaign.subject || "Sem assunto",
-              content: [{ type: "text/html", value: personalizedHtml }],
-              custom_args: {
-                campaign_id,
-                send_id: sendRecord?.id || "",
-                contact_id: contact.id,
-              },
-              tracking_settings: {
-                click_tracking: { enable: true },
-                open_tracking: { enable: true },
-              },
-            }),
-          });
+      batchesQueued++;
 
-          if (sgResponse.ok || sgResponse.status === 202) {
-            // Get message ID from response headers
-            const messageId = sgResponse.headers.get("X-Message-Id") || null;
-            await supabase.from("sends").update({
-              status: "sent",
-              sent_at: new Date().toISOString(),
-              sendgrid_message_id: messageId,
-            }).eq("id", sendRecord?.id);
-            sent++;
-          } else {
-            const errorBody = await sgResponse.text();
-            await supabase.from("sends").update({
-              status: "failed",
-              error_message: errorBody.substring(0, 500),
-            }).eq("id", sendRecord?.id);
-            failed++;
-            errors.push(`${contact.email}: ${sgResponse.status}`);
-          }
-
-          // Consume response body if not already consumed
-          if (sgResponse.bodyUsed === false) {
-            await sgResponse.text();
-          }
-        } catch (err: any) {
-          failed++;
-          errors.push(`${contact.email}: ${err.message}`);
-        }
+      // Stagger batch invocations to avoid rate limiting
+      if (i + BATCH_SIZE < contacts.length) {
+        await new Promise((r) => setTimeout(r, batchDelayMs));
       }
-
-      // Batch delay
-      if (campaign.batch_delay_seconds && i + batchSize < contacts.length) {
-        await new Promise((r) => setTimeout(r, (campaign.batch_delay_seconds || 1) * 1000));
-      }
-    }
-
-    // Update campaign status
-    const finalStatus = failed === contacts.length ? "error" : "completed";
-    await supabase.from("campaigns").update({
-      status: finalStatus,
-      completed_at: new Date().toISOString(),
-    }).eq("id", campaign_id);
-
-    // Log event for delivered
-    if (sent > 0) {
-      await supabase.from("events").insert(
-        contacts.slice(0, sent).map((c: any) => ({
-          company_id: campaign.company_id,
-          campaign_id,
-          contact_id: c.id,
-          event_type: "delivered" as const,
-        }))
-      );
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        total: contacts.length,
-        sent,
-        failed,
-        errors: errors.slice(0, 10),
+        total_contacts: contacts.length,
+        batches_queued: batchesQueued,
+        batch_size: BATCH_SIZE,
+        message: `Envio iniciado: ${contacts.length} contatos em ${totalBatches} lotes`,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
