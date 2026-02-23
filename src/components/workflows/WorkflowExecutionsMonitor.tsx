@@ -1,9 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Users, Clock, CheckCircle, XCircle, Play, AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Users, Clock, CheckCircle, XCircle, Play, AlertTriangle, StopCircle } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { toast } from "sonner";
 
 interface Props {
   workflowId: string;
@@ -32,6 +34,8 @@ const stepTypeLabels: Record<string, string> = {
 };
 
 export function WorkflowExecutionsMonitor({ workflowId }: Props) {
+  const queryClient = useQueryClient();
+
   // Fetch executions with contact info
   const { data: executions = [], isLoading } = useQuery({
     queryKey: ["workflow-executions", workflowId],
@@ -57,6 +61,28 @@ export function WorkflowExecutionsMonitor({ workflowId }: Props) {
         .eq("workflow_id", workflowId);
       return data || [];
     },
+  });
+
+  // Cancel execution
+  const cancelExecution = useMutation({
+    mutationFn: async (executionId: string) => {
+      const { error } = await supabase
+        .from("workflow_executions")
+        .update({ status: "failed", error_message: "Cancelado manualmente", completed_at: new Date().toISOString() })
+        .eq("id", executionId);
+      if (error) throw error;
+      // Also mark pending steps as failed
+      await supabase
+        .from("workflow_execution_steps")
+        .update({ status: "skipped" })
+        .eq("execution_id", executionId)
+        .eq("status", "pending");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workflow-executions", workflowId] });
+      toast.success("Execução cancelada!");
+    },
+    onError: (e: any) => toast.error(e.message),
   });
 
   const stepsMap = Object.fromEntries(steps.map((s: any) => [s.id, s]));
@@ -129,6 +155,7 @@ export function WorkflowExecutionsMonitor({ workflowId }: Props) {
                 <TableHead>Step Atual</TableHead>
                 <TableHead>Progresso</TableHead>
                 <TableHead>Iniciado em</TableHead>
+                <TableHead className="w-[80px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -171,6 +198,22 @@ export function WorkflowExecutionsMonitor({ workflowId }: Props) {
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {new Date(exec.started_at).toLocaleString("pt-BR")}
+                    </TableCell>
+                    <TableCell>
+                      {exec.status === "running" && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                          title="Cancelar execução"
+                          onClick={() => {
+                            if (confirm("Cancelar esta execução?")) cancelExecution.mutate(exec.id);
+                          }}
+                          disabled={cancelExecution.isPending}
+                        >
+                          <StopCircle className="h-4 w-4" />
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 );
