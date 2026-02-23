@@ -25,6 +25,7 @@ interface MappedContact {
   company_name: string;
   origin: string;
   tags: string;
+  store_name: string;
   _raw: ParsedRow;
   _valid: boolean;
   _error?: string;
@@ -46,6 +47,7 @@ const SYSTEM_FIELDS = [
   { key: "company_name", label: "Empresa" },
   { key: "origin", label: "Origem" },
   { key: "tags", label: "Tags (separar por vírgula)" },
+  { key: "store_name", label: "Loja" },
   { key: "__ignore", label: "— Ignorar —" },
 ];
 
@@ -108,6 +110,7 @@ export function CsvImportDialog({ open, onOpenChange }: Props) {
           else if (lower.includes("empresa") || lower.includes("company")) autoMap[h] = "company_name";
           else if (lower.includes("origem") || lower.includes("origin") || lower.includes("source")) autoMap[h] = "origin";
           else if (lower.includes("tag")) autoMap[h] = "tags";
+          else if (lower.includes("loja") || lower.includes("store") || lower.includes("unidade")) autoMap[h] = "store_name";
           else autoMap[h] = "__ignore";
         });
         setMapping(autoMap);
@@ -135,7 +138,7 @@ export function CsvImportDialog({ open, onOpenChange }: Props) {
     const seenEmails = new Set<string>();
     const mapped: MappedContact[] = csvRows.map((row) => {
       const contact: MappedContact = {
-        name: "", email: "", phone: "", company_name: "", origin: "", tags: "",
+        name: "", email: "", phone: "", company_name: "", origin: "", tags: "", store_name: "",
         _raw: row, _valid: true,
       };
 
@@ -176,6 +179,18 @@ export function CsvImportDialog({ open, onOpenChange }: Props) {
     let invalid = mappedData.filter((c) => !c._valid && !c._duplicate).length;
     const errors: ImportReport["errors"] = [];
 
+    // Resolve store names to IDs
+    const uniqueStoreNames = [...new Set(valid.map((c) => c.store_name?.trim()).filter(Boolean))];
+    const storeIdMap: Record<string, string> = {};
+    for (const storeName of uniqueStoreNames) {
+      const { data: store } = await supabase
+        .from("stores")
+        .upsert({ company_id: companyId, name: storeName }, { onConflict: "company_id,name" })
+        .select("id")
+        .single();
+      if (store) storeIdMap[storeName.toLowerCase()] = store.id;
+    }
+
     // Batch insert in chunks of 500 for better throughput
     const batchSize = 500;
     for (let i = 0; i < valid.length; i += batchSize) {
@@ -186,6 +201,7 @@ export function CsvImportDialog({ open, onOpenChange }: Props) {
         phone: c.phone || null,
         company_name: c.company_name || null,
         origin: c.origin || "Importação CSV",
+        store_id: c.store_name?.trim() ? storeIdMap[c.store_name.trim().toLowerCase()] || null : null,
       }));
 
       try {
