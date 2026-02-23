@@ -21,7 +21,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Save, Plus, Play, Pause } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ArrowLeft, Save, Plus, Play, Pause, BarChart3 } from "lucide-react";
 import { TriggerNode } from "@/components/workflows/nodes/TriggerNode";
 import { SendEmailNode } from "@/components/workflows/nodes/SendEmailNode";
 import { DelayNode } from "@/components/workflows/nodes/DelayNode";
@@ -30,7 +31,7 @@ import { TagNode } from "@/components/workflows/nodes/TagNode";
 import { WorkflowStepConfig } from "@/components/workflows/WorkflowStepConfig";
 import { WorkflowTriggerConfig } from "@/components/workflows/WorkflowTriggerConfig";
 import { AddStepMenu } from "@/components/workflows/AddStepMenu";
-
+import { WorkflowExecutionsMonitor } from "@/components/workflows/WorkflowExecutionsMonitor";
 const nodeTypes = {
   trigger: TriggerNode,
   send_email: SendEmailNode,
@@ -55,7 +56,7 @@ export default function WorkflowEditorPage() {
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showTriggerConfig, setShowTriggerConfig] = useState(false);
-
+  const [activeTab, setActiveTab] = useState("editor");
   // Load workflow
   const { data: workflow, isLoading } = useQuery({
     queryKey: ["workflow-detail", id],
@@ -272,9 +273,11 @@ export default function WorkflowEditorPage() {
           className="max-w-xs h-8 font-semibold"
         />
         <div className="flex-1" />
-        <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowAddMenu(true)}>
-          <Plus className="h-3.5 w-3.5" /> Adicionar Step
-        </Button>
+        {activeTab === "editor" && (
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowAddMenu(true)}>
+            <Plus className="h-3.5 w-3.5" /> Adicionar Step
+          </Button>
+        )}
         <Button variant="outline" size="sm" className="gap-1.5" onClick={toggleStatus}>
           {workflowStatus === "active" ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
           {workflowStatus === "active" ? "Pausar" : "Ativar"}
@@ -284,24 +287,39 @@ export default function WorkflowEditorPage() {
         </Button>
       </div>
 
-      {/* Flow editor */}
-      <div className="h-[calc(100vh-180px)] rounded-xl border border-border bg-card overflow-hidden">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onNodeClick={onNodeClick}
-          nodeTypes={nodeTypes}
-          fitView
-          proOptions={{ hideAttribution: true }}
-          defaultEdgeOptions={{ animated: true, style: { stroke: "hsl(var(--primary))", strokeWidth: 2 } }}
-        >
-          <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="hsl(var(--border))" />
-          <Controls className="!bg-card !border-border !shadow-lg" />
-        </ReactFlow>
-      </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="mb-4">
+          <TabsTrigger value="editor">Editor</TabsTrigger>
+          <TabsTrigger value="monitor" className="gap-1.5">
+            <BarChart3 className="h-3.5 w-3.5" /> Monitoramento
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="editor">
+          {/* Flow editor */}
+          <div className="h-[calc(100vh-230px)] rounded-xl border border-border bg-card overflow-hidden">
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              onNodeClick={onNodeClick}
+              nodeTypes={nodeTypes}
+              fitView
+              proOptions={{ hideAttribution: true }}
+              defaultEdgeOptions={{ animated: true, style: { stroke: "hsl(var(--primary))", strokeWidth: 2 } }}
+            >
+              <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="hsl(var(--border))" />
+              <Controls className="!bg-card !border-border !shadow-lg" />
+            </ReactFlow>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="monitor">
+          <WorkflowExecutionsMonitor workflowId={id!} />
+        </TabsContent>
+      </Tabs>
 
       {/* Step config sidebar */}
       {selectedNode && (
