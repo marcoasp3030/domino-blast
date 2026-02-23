@@ -281,15 +281,15 @@ export default function ContactsPage() {
 
   const exportCsv = async () => {
     toast.info("Exportando contatos...");
-    let q = supabase.from("contacts").select("name, email, phone, status, origin, created_at").order("created_at", { ascending: false });
+    let q = supabase.from("contacts").select("name, email, phone, status, origin, created_at, stores(name)").order("created_at", { ascending: false });
     if (search) q = q.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
     if (statusFilter !== "all") q = q.eq("status", statusFilter as ContactStatus);
     const { data } = await q.limit(5000);
     if (!data || data.length === 0) { toast.error("Nenhum contato para exportar"); return; }
-    const header = "Nome,Email,Telefone,Status,Origem,Cadastro\n";
-    const rows = data.map((c) =>
-      [c.name || "", c.email, c.phone || "", statusLabel[c.status] || c.status, c.origin || "", new Date(c.created_at).toLocaleDateString("pt-BR")]
-        .map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")
+    const header = "Nome,Email,Telefone,Status,Loja,Origem,Cadastro\n";
+    const rows = data.map((c: any) =>
+      [c.name || "", c.email, c.phone || "", statusLabel[c.status] || c.status, c.stores?.name || "", c.origin || "", new Date(c.created_at).toLocaleDateString("pt-BR")]
+        .map((v: string) => `"${String(v).replace(/"/g, '""')}"`).join(",")
     ).join("\n");
     const blob = new Blob([header + rows], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
