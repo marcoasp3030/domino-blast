@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Plus, Zap, Play, Pause, Trash2, Pencil, Users, BarChart3 } from "lucide-react";
+import { Plus, Zap, Play, Pause, Trash2, Pencil, Copy } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { workflowTemplates, type WorkflowTemplate } from "@/components/workflows/workflowTemplates";
 
 const statusConfig: Record<string, { label: string; class: string }> = {
   draft: { label: "Rascunho", class: "badge-neutral" },
@@ -27,6 +29,7 @@ export default function WorkflowsPage() {
   const { companyId } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const [showTemplates, setShowTemplates] = useState(false);
 
   const { data: workflows = [], isLoading } = useQuery({
     queryKey: ["workflows", companyId],
@@ -52,6 +55,111 @@ export default function WorkflowsPage() {
       return data;
     },
     onSuccess: (data) => {
+      navigate(`/workflows/${data.id}`);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  // Duplicate workflow
+  const duplicateWorkflow = useMutation({
+    mutationFn: async (workflowId: string) => {
+      // Fetch workflow
+      const { data: src } = await supabase.from("workflows").select("*").eq("id", workflowId).single();
+      if (!src) throw new Error("Workflow não encontrado");
+
+      // Create copy
+      const { data: newWf, error: wfErr } = await supabase
+        .from("workflows")
+        .insert({
+          company_id: companyId!,
+          name: `${src.name} (cópia)`,
+          trigger_type: src.trigger_type,
+          trigger_config: src.trigger_config,
+          description: src.description,
+          status: "draft",
+        })
+        .select("id")
+        .single();
+      if (wfErr) throw wfErr;
+
+      // Copy steps
+      const { data: srcSteps } = await supabase.from("workflow_steps").select("*").eq("workflow_id", workflowId);
+      const idMap: Record<string, string> = {};
+      if (srcSteps && srcSteps.length > 0) {
+        const newSteps = srcSteps.map((s) => {
+          const newId = crypto.randomUUID();
+          idMap[s.id] = newId;
+          return { id: newId, workflow_id: newWf!.id, step_type: s.step_type, config: s.config, position_x: s.position_x, position_y: s.position_y };
+        });
+        await supabase.from("workflow_steps").insert(newSteps);
+      }
+
+      // Copy edges
+      const { data: srcEdges } = await supabase.from("workflow_edges").select("*").eq("workflow_id", workflowId);
+      if (srcEdges && srcEdges.length > 0) {
+        const newEdges = srcEdges.map((e) => ({
+          workflow_id: newWf!.id,
+          source_step_id: e.source_step_id === "trigger" ? "trigger" : (idMap[e.source_step_id] || e.source_step_id),
+          target_step_id: idMap[e.target_step_id] || e.target_step_id,
+          source_handle: e.source_handle,
+        }));
+        await supabase.from("workflow_edges").insert(newEdges);
+      }
+
+      return newWf!;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["workflows"] });
+      toast.success("Automação duplicada!");
+      navigate(`/workflows/${data.id}`);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  // Create from template
+  const createFromTemplate = useMutation({
+    mutationFn: async (template: WorkflowTemplate) => {
+      const { data: newWf, error: wfErr } = await supabase
+        .from("workflows")
+        .insert({
+          company_id: companyId!,
+          name: template.name,
+          trigger_type: template.triggerType,
+          trigger_config: template.triggerConfig,
+          description: template.description,
+          status: "draft",
+        })
+        .select("id")
+        .single();
+      if (wfErr) throw wfErr;
+
+      // Map template step IDs to real UUIDs
+      const idMap: Record<string, string> = {};
+      const stepsToInsert = template.steps.map((s) => {
+        const newId = crypto.randomUUID();
+        idMap[s.id] = newId;
+        return { id: newId, workflow_id: newWf!.id, step_type: s.stepType, config: s.config, position_x: s.positionX, position_y: s.positionY };
+      });
+      if (stepsToInsert.length > 0) {
+        await supabase.from("workflow_steps").insert(stepsToInsert);
+      }
+
+      const edgesToInsert = template.edges.map((e) => ({
+        workflow_id: newWf!.id,
+        source_step_id: e.sourceId === "trigger" ? "trigger" : (idMap[e.sourceId] || e.sourceId),
+        target_step_id: idMap[e.targetId] || e.targetId,
+        source_handle: e.sourceHandle,
+      }));
+      if (edgesToInsert.length > 0) {
+        await supabase.from("workflow_edges").insert(edgesToInsert);
+      }
+
+      return newWf!;
+    },
+    onSuccess: (data) => {
+      setShowTemplates(false);
+      queryClient.invalidateQueries({ queryKey: ["workflows"] });
+      toast.success("Automação criada a partir do template!");
       navigate(`/workflows/${data.id}`);
     },
     onError: (e: any) => toast.error(e.message),
@@ -90,9 +198,14 @@ export default function WorkflowsPage() {
           <h1 className="page-title">Automações</h1>
           <p className="page-description">Crie sequências automáticas de emails com triggers, delays e condições</p>
         </div>
-        <Button size="sm" className="gap-2" onClick={() => createWorkflow.mutate()} disabled={createWorkflow.isPending}>
-          <Plus className="h-4 w-4" /> Nova Automação
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" className="gap-2" onClick={() => setShowTemplates(true)}>
+            <Zap className="h-4 w-4" /> Templates
+          </Button>
+          <Button size="sm" className="gap-2" onClick={() => createWorkflow.mutate()} disabled={createWorkflow.isPending}>
+            <Plus className="h-4 w-4" /> Nova Automação
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4">
@@ -102,7 +215,7 @@ export default function WorkflowsPage() {
           <div className="rounded-xl border border-border bg-card p-12 text-center text-muted-foreground">
             <Zap className="h-12 w-12 mx-auto mb-3 opacity-30" />
             <p>Nenhuma automação criada ainda.</p>
-            <p className="text-sm mt-1">Clique em "Nova Automação" para começar.</p>
+            <p className="text-sm mt-1">Clique em "Nova Automação" ou escolha um template para começar.</p>
           </div>
         ) : (
           workflows.map((w: any) => {
@@ -131,6 +244,16 @@ export default function WorkflowsPage() {
                     <Button size="sm" variant="outline" className="gap-1.5 h-8" onClick={() => navigate(`/workflows/${w.id}`)}>
                       <Pencil className="h-3.5 w-3.5" /> Editar
                     </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5 h-8"
+                      onClick={() => duplicateWorkflow.mutate(w.id)}
+                      disabled={duplicateWorkflow.isPending}
+                      title="Duplicar automação"
+                    >
+                      <Copy className="h-3.5 w-3.5" /> Duplicar
+                    </Button>
                     {(w.status === "active" || w.status === "paused") && (
                       <Button
                         size="sm"
@@ -157,6 +280,39 @@ export default function WorkflowsPage() {
           })
         )}
       </div>
+
+      {/* Templates Dialog */}
+      <Dialog open={showTemplates} onOpenChange={setShowTemplates}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Templates de Automação</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3 mt-2">
+            {workflowTemplates.map((t) => (
+              <button
+                key={t.id}
+                className="flex items-start gap-4 rounded-xl border border-border bg-card p-4 text-left hover:border-primary/50 hover:shadow-sm transition-all"
+                onClick={() => createFromTemplate.mutate(t)}
+                disabled={createFromTemplate.isPending}
+              >
+                <span className="text-2xl shrink-0">{t.icon}</span>
+                <div className="min-w-0">
+                  <h4 className="font-semibold text-sm">{t.name}</h4>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t.description}</p>
+                  <div className="flex gap-2 mt-2">
+                    <Badge variant="secondary" className="text-[10px]">
+                      {t.steps.length} steps
+                    </Badge>
+                    <Badge variant="secondary" className="text-[10px]">
+                      {triggerLabels[t.triggerType] || t.triggerType}
+                    </Badge>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }
