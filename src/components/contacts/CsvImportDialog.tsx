@@ -176,8 +176,8 @@ export function CsvImportDialog({ open, onOpenChange }: Props) {
     let invalid = mappedData.filter((c) => !c._valid && !c._duplicate).length;
     const errors: ImportReport["errors"] = [];
 
-    // Batch insert in chunks of 50
-    const batchSize = 50;
+    // Batch insert in chunks of 500 for better throughput
+    const batchSize = 500;
     for (let i = 0; i < valid.length; i += batchSize) {
       const batch = valid.slice(i, i + batchSize).map((c) => ({
         company_id: companyId,
@@ -188,22 +188,87 @@ export function CsvImportDialog({ open, onOpenChange }: Props) {
         origin: c.origin || "Importação CSV",
       }));
 
-      const { error, data } = await supabase.from("contacts").upsert(batch, {
-        onConflict: "company_id,email",
-        ignoreDuplicates: true,
-      }).select();
+      try {
+        const { error, data } = await supabase.from("contacts").upsert(batch, {
+          onConflict: "company_id,email",
+          ignoreDuplicates: true,
+        }).select("id");
 
-      if (error) {
+        if (error) {
+          // On error, try smaller chunks to isolate problematic rows
+          const smallBatch = 50;
+          for (let j = 0; j < batch.length; j += smallBatch) {
+            const subBatch = batch.slice(j, j + smallBatch);
+            const { error: subError, data: subData } = await supabase.from("contacts").upsert(subBatch, {
+              onConflict: "company_id,email",
+              ignoreDuplicates: true,
+            }).select("id");
+
+            if (subError) {
+              subBatch.forEach((b, idx) => {
+                errors.push({ row: i + j + idx + 2, email: b.email, reason: subError.message });
+              });
+            } else {
+              imported += subData?.length || 0;
+              duplicates += subBatch.length - (subData?.length || 0);
+            }
+          }
+        } else {
+          imported += data?.length || 0;
+          const skipped = batch.length - (data?.length || 0);
+          duplicates += skipped;
+        }
+      } catch (err: any) {
         batch.forEach((b, idx) => {
-          errors.push({ row: i + idx + 2, email: b.email, reason: error.message });
+          errors.push({ row: i + idx + 2, email: b.email, reason: err.message || "Erro desconhecido" });
         });
-      } else {
-        imported += data?.length || 0;
-        const skipped = batch.length - (data?.length || 0);
-        duplicates += skipped;
       }
 
-      setProgress(Math.round(((i + batchSize) / totalToImport) * 100));
+      setProgress(Math.min(100, Math.round(((i + batchSize) / totalToImport) * 100)));
+
+      // Yield to UI every 2000 contacts
+      if (i % 2000 === 0 && i > 0) {
+        await new Promise((r) => setTimeout(r, 50));
+      }
+    }
+
+    // Handle tags for imported contacts (process in background)
+    const contactsWithTags = valid.filter((c) => c.tags?.trim());
+    if (contactsWithTags.length > 0) {
+      // Process tags in small batches to avoid blocking
+      for (let i = 0; i < contactsWithTags.length; i += 100) {
+        const tagBatch = contactsWithTags.slice(i, i + 100);
+        for (const c of tagBatch) {
+          const tags = c.tags.split(",").map((t) => t.trim()).filter(Boolean);
+          if (tags.length === 0) continue;
+
+          // Get contact id
+          const { data: contact } = await supabase
+            .from("contacts")
+            .select("id")
+            .eq("company_id", companyId)
+            .eq("email", c.email)
+            .single();
+
+          if (!contact) continue;
+
+          for (const tagName of tags) {
+            // Upsert tag
+            const { data: tag } = await supabase
+              .from("tags")
+              .upsert({ company_id: companyId, name: tagName }, { onConflict: "company_id,name" })
+              .select("id")
+              .single();
+
+            if (tag) {
+              await supabase.from("contact_tags").upsert(
+                { contact_id: contact.id, tag_id: tag.id },
+                { onConflict: "contact_id,tag_id" }
+              );
+            }
+          }
+        }
+      }
     }
 
     setReport({
@@ -211,7 +276,7 @@ export function CsvImportDialog({ open, onOpenChange }: Props) {
       imported,
       duplicates,
       invalid,
-      errors,
+      errors: errors.slice(0, 100), // Limit error display
     });
     queryClient.invalidateQueries({ queryKey: ["contacts"] });
     setStep("report");
