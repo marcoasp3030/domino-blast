@@ -1,0 +1,1 @@
+ALTER TABLE public.suppressions ADD CONSTRAINT suppressions_email_company_id_unique UNIQUE (email, company_id);
