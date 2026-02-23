@@ -22,18 +22,21 @@ const statusLabel: Record<string, string> = {
   error: "Erro",
 };
 
-export function RecentCampaigns() {
+export function RecentCampaigns({ storeFilter = "all" }: { storeFilter?: string }) {
   const { companyId } = useAuth();
   const queryClient = useQueryClient();
 
   const { data: campaigns = [] } = useQuery({
-    queryKey: ["recent-campaigns", companyId],
+    queryKey: ["recent-campaigns", companyId, storeFilter],
     queryFn: async () => {
-      const { data } = await supabase
+      let q = supabase
         .from("campaigns")
-        .select("*")
+        .select("*, stores(name)")
         .order("created_at", { ascending: false })
         .limit(5);
+      if (storeFilter === "none") q = q.is("store_id", null);
+      else if (storeFilter !== "all") q = q.eq("store_id", storeFilter);
+      const { data } = await q;
       return data || [];
     },
     enabled: !!companyId,
