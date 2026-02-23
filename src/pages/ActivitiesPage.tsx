@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ResponseTimeChart } from "@/components/activities/ResponseTimeChart";
+import { EngagementPieChart } from "@/components/activities/EngagementPieChart";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -303,9 +304,12 @@ export default function ActivitiesPage() {
         </div>
       </div>
 
-      {/* Response Time Chart */}
-      <div className="mb-6">
-        <ResponseTimeChart engagements={engagements} />
+      {/* Charts */}
+      <div className="grid gap-6 lg:grid-cols-3 mb-6">
+        <div className="lg:col-span-2">
+          <ResponseTimeChart engagements={engagements} />
+        </div>
+        <EngagementPieChart engaged={stats.engaged} openedOnly={stats.openedOnly} rejected={stats.rejected} />
       </div>
 
       {/* Toolbar */}
