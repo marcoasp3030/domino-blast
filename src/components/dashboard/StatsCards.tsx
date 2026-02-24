@@ -86,7 +86,7 @@ export function StatsCards({ storeFilter = "all" }: StatsCardsProps) {
     { label: "Entregues", value: stats?.delivered || 0, rate: stats?.totalSent ? `${((stats.delivered / stats.totalSent) * 100).toFixed(1)}%` : "-", icon: CheckCircle2, gradient: "var(--gradient-success)" },
     { label: "Abertos", value: stats?.opened || 0, rate: stats?.delivered ? `${((stats.opened / stats.delivered) * 100).toFixed(1)}%` : "-", icon: Eye, gradient: "var(--gradient-purple)" },
     { label: "Clicados", value: stats?.clicked || 0, rate: stats?.delivered ? `${((stats.clicked / stats.delivered) * 100).toFixed(1)}%` : "-", icon: MousePointerClick, gradient: "var(--gradient-warning)" },
-    { label: "Bounces", value: stats?.bounced || 0, rate: stats?.totalSent ? `${((stats.bounced / stats.totalSent) * 100).toFixed(1)}%` : "-", icon: AlertTriangle, gradient: "var(--gradient-danger)" },
+    { label: "Rejeições", value: stats?.bounced || 0, rate: stats?.totalSent ? `${((stats.bounced / stats.totalSent) * 100).toFixed(1)}%` : "-", icon: AlertTriangle, gradient: "var(--gradient-danger)" },
     { label: "Spam", value: stats?.spam || 0, rate: stats?.totalSent ? `${((stats.spam / stats.totalSent) * 100).toFixed(1)}%` : "-", icon: ShieldAlert, gradient: "var(--gradient-danger)" },
   ];
 

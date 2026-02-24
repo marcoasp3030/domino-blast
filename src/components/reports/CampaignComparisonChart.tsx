@@ -62,7 +62,7 @@ export function CampaignComparisonChart() {
         <Trophy className="h-5 w-5 text-primary" />
         <h3 className="text-base font-semibold">Comparativo de Campanhas</h3>
       </div>
-      <p className="text-sm text-muted-foreground mb-6">Taxas de abertura, clique e bounce por campanha (últimas 20 concluídas)</p>
+      <p className="text-sm text-muted-foreground mb-6">Taxas de abertura, clique e rejeição por campanha (últimas 20 concluídas)</p>
 
       {isLoading ? (
         <Skeleton className="h-[350px] w-full rounded-lg" />
@@ -116,7 +116,7 @@ export function CampaignComparisonChart() {
                         <div className="flex justify-between">
                           <span className="flex items-center gap-1.5">
                             <span className="h-2.5 w-2.5 rounded-full" style={{ background: METRIC_COLORS.bounceRate }} />
-                            Bounce
+                            Rejeição
                           </span>
                           <span className="font-medium tabular-nums">{d.bounceRate}% <span className="text-muted-foreground font-normal">({d.bounces})</span></span>
                         </div>
@@ -128,7 +128,7 @@ export function CampaignComparisonChart() {
               <Legend wrapperStyle={{ fontSize: "12px", paddingTop: "8px" }} />
               <Bar dataKey="openRate" name="Abertura %" fill={METRIC_COLORS.openRate} radius={[3, 3, 0, 0]} />
               <Bar dataKey="clickRate" name="Clique %" fill={METRIC_COLORS.clickRate} radius={[3, 3, 0, 0]} />
-              <Bar dataKey="bounceRate" name="Bounce %" fill={METRIC_COLORS.bounceRate} radius={[3, 3, 0, 0]} />
+              <Bar dataKey="bounceRate" name="Rejeição %" fill={METRIC_COLORS.bounceRate} radius={[3, 3, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </>
