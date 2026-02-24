@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -165,9 +166,12 @@ function blockToHtml(block: Block): string {
   }
 }
 
-function blocksToFullHtml(blocks: Block[], bodyBg: string, contentBg: string, contentWidth: string): string {
+function blocksToFullHtml(blocks: Block[], bodyBg: string, contentBg: string, contentWidth: string, includeUnsubscribeFooter: boolean = true): string {
   const inner = blocks.map(blockToHtml).join("\n");
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:0;background:${bodyBg};"><div style="max-width:${contentWidth}px;margin:0 auto;background:${contentBg};padding:32px;border-radius:8px;">${inner}</div></body></html>`;
+  const unsubscribeFooter = includeUnsubscribeFooter
+    ? `<div style="text-align:center;padding:16px 0 8px;"><a href="{{unsubscribe_url}}" style="font-size:12px;color:#999;font-family:Arial,sans-serif;text-decoration:underline;">Não desejo mais receber estes emails</a></div>`
+    : "";
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:0;background:${bodyBg};"><div style="max-width:${contentWidth}px;margin:0 auto;background:${contentBg};padding:32px;border-radius:8px;">${inner}${unsubscribeFooter}</div></body></html>`;
 }
 
 // ── Align Selector ──
@@ -577,7 +581,7 @@ export function TemplateEditorDialog({ open, onOpenChange, template }: Props) {
   const [saving, setSaving] = useState(false);
   const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop");
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
-  const [emailSettings, setEmailSettings] = useState({ bodyBg: "#f4f4f5", contentBg: "#ffffff", contentWidth: "600" });
+  const [emailSettings, setEmailSettings] = useState({ bodyBg: "#f4f4f5", contentBg: "#ffffff", contentWidth: "600", includeUnsubscribeFooter: true });
 
   // Reset blocks when template changes
   useEffect(() => {
@@ -625,7 +629,7 @@ export function TemplateEditorDialog({ open, onOpenChange, template }: Props) {
     setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, content } : b)));
   };
 
-  const html = blocksToFullHtml(blocks, emailSettings.bodyBg, emailSettings.contentBg, emailSettings.contentWidth);
+  const html = blocksToFullHtml(blocks, emailSettings.bodyBg, emailSettings.contentBg, emailSettings.contentWidth, emailSettings.includeUnsubscribeFooter);
 
   const save = async () => {
     if (!template?.id || !companyId) return;
@@ -723,6 +727,16 @@ export function TemplateEditorDialog({ open, onOpenChange, template }: Props) {
                       <Label className="text-[11px]">Conteúdo</Label>
                     </div>
                     <div><Label className="text-[11px]">Largura (px)</Label><Input type="number" value={emailSettings.contentWidth} onChange={(e) => setEmailSettings({ ...emailSettings, contentWidth: e.target.value })} className="mt-1 h-7 text-xs" min="400" max="800" /></div>
+                    <div className="flex items-center gap-2 pt-2 border-t border-border mt-2">
+                      <Checkbox
+                        id="unsubscribe-footer"
+                        checked={emailSettings.includeUnsubscribeFooter}
+                        onCheckedChange={(checked) => setEmailSettings({ ...emailSettings, includeUnsubscribeFooter: !!checked })}
+                      />
+                      <Label htmlFor="unsubscribe-footer" className="text-[11px] leading-tight cursor-pointer">
+                        Incluir link de descadastro no rodapé
+                      </Label>
+                    </div>
                   </div>
                 </div>
               </div>
