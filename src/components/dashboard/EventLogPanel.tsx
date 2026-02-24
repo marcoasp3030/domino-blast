@@ -13,7 +13,7 @@ const eventConfig: Record<string, { label: string; icon: React.ElementType; vari
   delivered: { label: "Entregue", icon: Mail, variant: "default" },
   open: { label: "Aberto", icon: Eye, variant: "secondary" },
   click: { label: "Clicado", icon: MousePointerClick, variant: "outline" },
-  bounce: { label: "Bounce", icon: AlertTriangle, variant: "destructive" },
+  bounce: { label: "Rejeição", icon: AlertTriangle, variant: "destructive" },
   spam: { label: "Spam", icon: ShieldX, variant: "destructive" },
   unsubscribe: { label: "Unsub", icon: UserMinus, variant: "destructive" },
   dropped: { label: "Dropped", icon: ArrowDownCircle, variant: "destructive" },

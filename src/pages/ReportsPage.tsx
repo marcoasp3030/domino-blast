@@ -84,14 +84,14 @@ export default function ReportsPage() {
     { label: "Entregas", value: delivered.toLocaleString("pt-BR"), icon: Mail, color: "hsl(152, 69%, 40%)", bg: "bg-emerald-100 dark:bg-emerald-900/30" },
     { label: "Taxa de Abertura", value: `${openRate}%`, sub: `${opens.toLocaleString("pt-BR")} aberturas`, icon: Eye, color: "hsl(262, 83%, 58%)", bg: "bg-violet-100 dark:bg-violet-900/30" },
     { label: "Taxa de Clique", value: `${clickRate}%`, sub: `${clicks.toLocaleString("pt-BR")} cliques`, icon: MousePointerClick, color: "hsl(38, 92%, 50%)", bg: "bg-amber-100 dark:bg-amber-900/30" },
-    { label: "Taxa de Bounce", value: `${bounceRate}%`, sub: `${bounces.toLocaleString("pt-BR")} bounces`, icon: AlertTriangle, color: "hsl(0, 72%, 51%)", bg: "bg-red-100 dark:bg-red-900/30" },
+    { label: "Taxa de Rejeição", value: `${bounceRate}%`, sub: `${bounces.toLocaleString("pt-BR")} rejeições`, icon: AlertTriangle, color: "hsl(0, 72%, 51%)", bg: "bg-red-100 dark:bg-red-900/30" },
   ];
 
   const chartData = [
     { name: "Entregues", value: delivered, fill: "hsl(152, 69%, 40%)" },
     { name: "Abertos", value: opens, fill: "hsl(262, 83%, 58%)" },
     { name: "Clicados", value: clicks, fill: "hsl(38, 92%, 50%)" },
-    { name: "Bounces", value: bounces, fill: "hsl(0, 72%, 51%)" },
+    { name: "Rejeições", value: bounces, fill: "hsl(0, 72%, 51%)" },
     { name: "Spam", value: eventCounts?.spam || 0, fill: "hsl(350, 80%, 55%)" },
     { name: "Unsub", value: eventCounts?.unsubscribe || 0, fill: "hsl(220, 10%, 46%)" },
   ];

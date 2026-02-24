@@ -19,7 +19,7 @@ const eventConfig: Record<string, { label: string; icon: React.ElementType; vari
   delivered: { label: "Entregues", icon: Mail, variant: "default", color: "text-emerald-600", bg: "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800" },
   open: { label: "Abriram", icon: Eye, variant: "secondary", color: "text-violet-600", bg: "bg-violet-50 dark:bg-violet-950/30 border-violet-200 dark:border-violet-800" },
   click: { label: "Clicaram", icon: MousePointerClick, variant: "outline", color: "text-amber-600", bg: "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800" },
-  bounce: { label: "Bounce", icon: AlertTriangle, variant: "destructive", color: "text-red-600", bg: "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800" },
+  bounce: { label: "Rejeição", icon: AlertTriangle, variant: "destructive", color: "text-red-600", bg: "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800" },
   spam: { label: "Spam", icon: ShieldX, variant: "destructive", color: "text-rose-600", bg: "bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-800" },
   unsubscribe: { label: "Descadastro", icon: UserMinus, variant: "destructive", color: "text-gray-600", bg: "bg-gray-50 dark:bg-gray-950/30 border-gray-200 dark:border-gray-700" },
   dropped: { label: "Dropped", icon: ArrowDownCircle, variant: "destructive", color: "text-gray-500", bg: "bg-gray-50 dark:bg-gray-950/30 border-gray-200 dark:border-gray-700" },

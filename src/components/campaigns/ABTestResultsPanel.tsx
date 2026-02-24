@@ -151,7 +151,7 @@ export function ABTestResultsPanel({ open, onOpenChange, campaign }: ABTestResul
           />
           <MetricRow
             icon={AlertTriangle}
-            label="Bounces"
+            label="Rejeições"
             value={metrics?.bounces || 0}
             total={metrics?.sent || 0}
             rate={bounceRate}

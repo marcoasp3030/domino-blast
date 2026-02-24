@@ -18,7 +18,7 @@ const labelMap: Record<string, string> = {
   delivered: "Entregues",
   open: "Abertos",
   click: "Clicados",
-  bounce: "Bounces",
+  bounce: "Rejeições",
   spam: "Spam",
   unsubscribe: "Unsubscribe",
   dropped: "Dropped",
